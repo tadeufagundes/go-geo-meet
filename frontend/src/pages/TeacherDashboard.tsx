@@ -26,10 +26,7 @@ export function TeacherDashboard() {
         setIsCreating(true);
         try {
             const turmaId = `turma-${Date.now()}`;
-            const response = await sessionService.createSession({
-                turmaId,
-                turmaName: newSessionTurma,
-            });
+            const response = await sessionService.createSession(turmaId, newSessionTurma);
 
             // Start and navigate to the room
             await sessionService.startSession(response.id);
@@ -172,16 +169,16 @@ export function TeacherDashboard() {
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${session.status === 'live'
-                                                ? 'bg-green-100'
-                                                : session.status === 'completed'
-                                                    ? 'bg-gray-100'
-                                                    : 'bg-navy-100'
+                                            ? 'bg-green-100'
+                                            : session.status === 'completed'
+                                                ? 'bg-gray-100'
+                                                : 'bg-navy-100'
                                             }`}>
                                             <Video className={`w-6 h-6 ${session.status === 'live'
-                                                    ? 'text-green-600'
-                                                    : session.status === 'completed'
-                                                        ? 'text-gray-400'
-                                                        : 'text-navy-600'
+                                                ? 'text-green-600'
+                                                : session.status === 'completed'
+                                                    ? 'text-gray-400'
+                                                    : 'text-navy-600'
                                                 }`} />
                                         </div>
                                         <div>
@@ -194,10 +191,10 @@ export function TeacherDashboard() {
                                                     {formatDate(session.scheduledAt)}
                                                 </span>
                                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${session.status === 'live'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : session.status === 'completed'
-                                                            ? 'bg-gray-100 text-gray-600'
-                                                            : 'bg-blue-100 text-blue-700'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : session.status === 'completed'
+                                                        ? 'bg-gray-100 text-gray-600'
+                                                        : 'bg-blue-100 text-blue-700'
                                                     }`}>
                                                     {session.status === 'live' ? 'Ao Vivo' : session.status === 'completed' ? 'Encerrada' : 'Agendada'}
                                                 </span>

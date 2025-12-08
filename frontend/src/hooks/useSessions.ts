@@ -1,14 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as sessionService from '../services/sessionService';
-import type { SessionDTO } from '../types';
+import type { SessionDTO } from '../services/sessionService';
 
 interface UseSessionsOptions {
     autoFetch?: boolean;
-    status?: string;
 }
 
 export function useSessions(options: UseSessionsOptions = {}) {
-    const { autoFetch = true, status } = options;
+    const { autoFetch = true } = options;
     const [sessions, setSessions] = useState<SessionDTO[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -18,7 +17,7 @@ export function useSessions(options: UseSessionsOptions = {}) {
         setError(null);
 
         try {
-            const data = await sessionService.listSessions(status);
+            const data = await sessionService.listSessions();
             setSessions(data);
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Erro ao carregar sessões';
@@ -26,7 +25,7 @@ export function useSessions(options: UseSessionsOptions = {}) {
         } finally {
             setIsLoading(false);
         }
-    }, [status]);
+    }, []);
 
     useEffect(() => {
         if (autoFetch) {
@@ -39,7 +38,7 @@ export function useSessions(options: UseSessionsOptions = {}) {
         setError(null);
 
         try {
-            const response = await sessionService.createSession({ turmaId, turmaName });
+            const response = await sessionService.createSession(turmaId, turmaName);
             // Refresh list after creating
             await fetchSessions();
             return response;
@@ -91,9 +90,8 @@ export function useSession(sessionId: string | undefined) {
         if (!sessionId) return;
 
         try {
-            const response = await sessionService.startSession(sessionId);
+            await sessionService.startSession(sessionId);
             setSession((prev) => prev ? { ...prev, status: 'live' } : null);
-            return response;
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Erro ao iniciar sessão';
             setError(message);
@@ -105,9 +103,8 @@ export function useSession(sessionId: string | undefined) {
         if (!sessionId) return;
 
         try {
-            const response = await sessionService.endSession(sessionId);
+            await sessionService.endSession(sessionId);
             setSession((prev) => prev ? { ...prev, status: 'completed' } : null);
-            return response;
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Erro ao encerrar sessão';
             setError(message);

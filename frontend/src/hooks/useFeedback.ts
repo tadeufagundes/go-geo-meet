@@ -61,7 +61,7 @@ export function useTeacherFeedback(options: UseTeacherFeedbackOptions) {
     const { sessionId, pollingInterval = 10000, enabled = true } = options;
     const [confusedStudents, setConfusedStudents] = useState<ConfusedStudent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const fetchFeedback = useCallback(async () => {
         if (!enabled || !sessionId) return;

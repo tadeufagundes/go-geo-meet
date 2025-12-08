@@ -20,9 +20,13 @@ export const db = getFirestore(app);
 if (import.meta.env.DEV) {
     const useEmulators = import.meta.env.VITE_USE_EMULATORS === 'true';
     if (useEmulators) {
-        connectAuthEmulator(auth, 'http://localhost:9099');
-        connectFirestoreEmulator(db, 'localhost', 8080);
-        console.log('Connected to Firebase emulators');
+        try {
+            connectAuthEmulator(auth, 'http://localhost:9099');
+            connectFirestoreEmulator(db, 'localhost', 8080);
+            console.log('Connected to Firebase emulators');
+        } catch (e) {
+            // Already connected
+        }
     }
 }
 

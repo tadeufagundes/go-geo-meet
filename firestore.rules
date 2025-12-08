@@ -10,44 +10,46 @@ service cloud.firestore {
       allow read: if true;
       
       // Only authenticated users can create sessions
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.teacherId == request.auth.uid;
       
-      // Only the teacher who created the session can update/delete
-      allow update, delete: if request.auth != null 
-        && request.auth.uid == resource.data.teacherId;
+      // Only the teacher who created can update
+      allow update: if request.auth != null 
+        && resource.data.teacherId == request.auth.uid;
+      
+      // No delete allowed
+      allow delete: if false;
     }
     
     // ============================================
     // Attendance Logs
     // ============================================
     match /meetAttendance/{logId} {
-      // Teachers can read attendance for their sessions
-      // Students can read their own attendance
-      allow read: if request.auth != null;
+      // Anyone can read attendance
+      allow read: if true;
       
       // Anyone can create attendance (joining a session)
       allow create: if true;
       
-      // Only the student or the session teacher can update
-      allow update: if request.auth != null 
-        && (request.auth.uid == resource.data.alunoId);
+      // Anyone can update their own attendance (for leftAt)
+      allow update: if true;
       
-      // Only session teacher can delete
-      allow delete: if request.auth != null;
+      // No delete
+      allow delete: if false;
     }
     
     // ============================================
     // Silent Feedback
     // ============================================
     match /meetFeedback/{feedbackId} {
-      // Anyone can read feedback (for polling)
+      // Anyone can read feedback
       allow read: if true;
       
-      // Anyone can create/update feedback (students)
+      // Anyone can create/update feedback
       allow create, update: if true;
       
-      // Only authenticated users can delete
-      allow delete: if request.auth != null;
+      // No delete
+      allow delete: if false;
     }
   }
 }
