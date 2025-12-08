@@ -24,8 +24,8 @@ declare global {
         constructor(domain: string, options: JitsiMeetExternalAPIOptions);
         dispose(): void;
         executeCommand(command: string, ...args: unknown[]): void;
-        addListener(event: string, callback: (...args: unknown[]) => void): void;
-        removeListener(event: string, callback: (...args: unknown[]) => void): void;
+        addListener(event: string, callback: (event: any) => void): void;
+        removeListener(event: string, callback: (event: any) => void): void;
         getParticipantsInfo(): JitsiParticipant[];
         getNumberOfParticipants(): number;
     }

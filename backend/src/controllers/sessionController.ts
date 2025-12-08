@@ -13,7 +13,7 @@ import {
     generateRoomPassword,
     generateJitsiUrl
 } from '../utils/roomNameGenerator';
-import { Errors, sendError, AppError } from '../utils/errors';
+import { Errors, sendError } from '../utils/errors';
 
 const db = admin.firestore();
 const SESSIONS_COLLECTION = 'meetSessions';
