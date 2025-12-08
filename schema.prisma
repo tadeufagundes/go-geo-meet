@@ -1,0 +1,132 @@
+// Este é o arquivo de schema para a plataforma Go Geo Meet.
+// Ele define os modelos de dados, relações e o provedor de banco de dados.
+// Comando para gerar o cliente Prisma: `npx prisma generate`
+// Comando para aplicar as migrações: `npx prisma migrate dev`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Pode ser alterado para mysql, sqlite, etc.
+  url      = env("DATABASE_URL")
+}
+
+// Modelo para Usuários (tanto Professores quanto Alunos)
+model User {
+  id    String @id @default(uuid())
+  email String @unique
+  name  String
+  role  Role   @default(STUDENT)
+
+  // Relações
+  classesAsTeacher Turma[]         @relation("TeacherToClass")
+  enrollments      TurmaAluno[]    @relation("StudentEnrollments")
+  attendanceLogs   AttendanceLog[]
+  silentFeedbacks  SilentFeedback[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Modelo para Turmas (ex: "Matemática 7A")
+model Turma {
+  id      String @id @default(uuid())
+  subject String // ex: "Matemática"
+  name    String // ex: "Turma 7A"
+
+  teacherId String
+  teacher   User   @relation("TeacherToClass", fields: [teacherId], references: [id])
+
+  // Relações
+  students         TurmaAluno[]   @relation("ClassEnrollments")
+  scheduledClasses AulaAgendada[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([subject, name, teacherId])
+}
+
+// Tabela de junção para a relação Muitos-para-Muitos entre Turma e Aluno
+model TurmaAluno {
+  turmaId String
+  turma   Turma  @relation("ClassEnrollments", fields: [turmaId], references: [id])
+
+  alunoId String
+  aluno   User   @relation("StudentEnrollments", fields: [alunoId], references: [id])
+
+  assignedAt DateTime @default(now())
+
+  @@id([turmaId, alunoId])
+}
+
+
+// Modelo para uma aula específica que foi agendada
+model AulaAgendada {
+  id        String   @id @default(uuid())
+  turmaId   String
+  turma     Turma    @relation(fields: [turmaId], references: [id])
+  status    StatusAula @default(SCHEDULED)
+  
+  scheduledAt DateTime // Horário que a aula deve começar
+
+  // Detalhes da sala de aula virtual
+  jitsiRoomName     String @unique
+  jitsiRoomPassword String
+
+  // Timestamps reais de início e fim
+  startedAt DateTime?
+  endedAt   DateTime?
+
+  // Relações
+  attendanceLogs  AttendanceLog[]
+  silentFeedbacks SilentFeedback[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Modelo para registrar cada evento de entrada e saída de um aluno em uma aula
+// Isso permite calcular com precisão o tempo total de presença, mesmo com quedas de conexão.
+model AttendanceLog {
+  id             String       @id @default(uuid())
+  alunoId        String
+  aluno          User         @relation(fields: [alunoId], references: [id])
+  aulaAgendadaId String
+  aulaAgendada   AulaAgendada @relation(fields: [aulaAgendadaId], references: [id])
+
+  joinedAt DateTime @default(now())
+  leftAt   DateTime? // Preenchido quando o aluno sai ou se desconecta
+}
+
+// Modelo para o estado de "Feedback Silencioso" de um aluno em uma aula
+// Um registro único por aluno por aula, que é atualizado conforme o estado muda.
+model SilentFeedback {
+  id             String       @id @default(uuid())
+  alunoId        String
+  aluno          User         @relation(fields: [alunoId], references: [id])
+  aulaAgendadaId String
+  aulaAgendada   AulaAgendada @relation(fields: [aulaAgendadaId], references: [id])
+
+  isConfused Boolean  @default(false) // O status principal: true se o aluno está com dúvida
+  updatedAt  DateTime @updatedAt // Para saber quando o status foi alterado pela última vez
+
+  // Garante que cada aluno tenha apenas um status de feedback por aula
+  @@unique([alunoId, aulaAgendadaId])
+}
+
+
+// Enums para tipos e status
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum StatusAula {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
+}

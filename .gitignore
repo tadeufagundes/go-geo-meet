@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+lib/
+build/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# Debug logs
+*.log
+npm-debug.log*
+firebase-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase
+.firebase/
+.runtimeconfig.json
+
+# TypeScript
+*.tsbuildinfo
+
+# Local executables
+*.exe

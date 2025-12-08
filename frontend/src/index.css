@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom global styles */
+:root {
+  --color-navy: #142b64;
+  --color-cyan: #009fe3;
+  --color-gold: #ffd700;
+}
+
+body {
+  font-family: 'Inter', 'Montserrat', system-ui, sans-serif;
+  @apply bg-gray-50 text-gray-900 antialiased;
+}
+
+/* Jitsi container styles */
+.jitsi-container {
+  @apply w-full h-full min-h-[500px] rounded-lg overflow-hidden shadow-lg;
+}
+
+/* Feedback button animation */
+@keyframes pulse-confused {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.animate-confused {
+  animation: pulse-confused 1.5s ease-in-out infinite;
+}

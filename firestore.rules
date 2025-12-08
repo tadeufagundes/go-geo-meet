@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // ============================================
+    // Meet Sessions
+    // ============================================
+    match /meetSessions/{sessionId} {
+      // Anyone can read sessions (to join)
+      allow read: if true;
+      
+      // Only authenticated users can create sessions
+      allow create: if request.auth != null;
+      
+      // Only the teacher who created the session can update/delete
+      allow update, delete: if request.auth != null 
+        && request.auth.uid == resource.data.teacherId;
+    }
+    
+    // ============================================
+    // Attendance Logs
+    // ============================================
+    match /meetAttendance/{logId} {
+      // Teachers can read attendance for their sessions
+      // Students can read their own attendance
+      allow read: if request.auth != null;
+      
+      // Anyone can create attendance (joining a session)
+      allow create: if true;
+      
+      // Only the student or the session teacher can update
+      allow update: if request.auth != null 
+        && (request.auth.uid == resource.data.alunoId);
+      
+      // Only session teacher can delete
+      allow delete: if request.auth != null;
+    }
+    
+    // ============================================
+    // Silent Feedback
+    // ============================================
+    match /meetFeedback/{feedbackId} {
+      // Anyone can read feedback (for polling)
+      allow read: if true;
+      
+      // Anyone can create/update feedback (students)
+      allow create, update: if true;
+      
+      // Only authenticated users can delete
+      allow delete: if request.auth != null;
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# Compiled output
+lib/
+
+# Dependencies
+node_modules/
+
+# Local firebase config
+.runtimeconfig.json
+
+# Debug logs
+*.log
+firebase-debug.log
+firebase-debug.*.log
+
+# Secret files
+.secret.local
+*.local
