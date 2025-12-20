@@ -6,7 +6,6 @@
     "go-geo-synapse": {
       "hosting": {
         "meet": [
-          "go-geo-meet",
           "gogeomeet"
         ]
       }
