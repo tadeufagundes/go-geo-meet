@@ -31,6 +31,7 @@ export function JitsiMeet({
         roomName,
         displayName,
         password,
+        role,
         onParticipantJoined,
         onParticipantLeft,
         onMeetingEnd,
