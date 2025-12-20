@@ -5,6 +5,15 @@ import { TeacherPanel } from '../components/teacher/TeacherPanel';
 import * as sessionService from '../services/sessionService';
 import type { Participant } from '../types';
 
+// Declare Jitsi API type for commands
+declare global {
+    interface Window {
+        jitsiApi?: {
+            executeCommand: (command: string, ...args: unknown[]) => void;
+        };
+    }
+}
+
 export function TeacherRoom() {
     const { sessionId: roomName } = useParams<{ sessionId: string }>();
     const [searchParams] = useSearchParams();
@@ -16,6 +25,7 @@ export function TeacherRoom() {
 
     const [participants, setParticipants] = useState<Participant[]>([]);
     const hasStarted = useRef(false);
+    const jitsiApiRef = useRef<{ executeCommand: (command: string, ...args: unknown[]) => void } | null>(null);
 
     // Start session on mount
     useEffect(() => {
@@ -54,6 +64,42 @@ export function TeacherRoom() {
         }
     }, [apiSessionId, handleMeetingEnd]);
 
+    // Store Jitsi API reference when ready
+    const handleJitsiReady = useCallback(() => {
+        // The Jitsi API is stored on window by our useJitsi hook
+        // We need to access it through the iframe
+        const iframe = document.querySelector('iframe[name="jitsiConferenceFrame"]') as HTMLIFrameElement;
+        if (iframe) {
+            // Store reference to execute commands
+            jitsiApiRef.current = window.jitsiApi || null;
+        }
+        console.log('[TeacherRoom] Jitsi ready');
+    }, []);
+
+    // Moderator controls
+    const handleShareScreen = useCallback(() => {
+        console.log('[TeacherRoom] Toggle share screen');
+        // The share screen is handled directly by Jitsi toolbar
+        // This is just for UI feedback in the panel
+    }, []);
+
+    const handleMuteAll = useCallback(() => {
+        console.log('[TeacherRoom] Mute everyone');
+        // Execute mute command if API is available
+        if (jitsiApiRef.current) {
+            jitsiApiRef.current.executeCommand('muteEveryone');
+        }
+    }, []);
+
+    const handleKickParticipant = useCallback((participantId: string) => {
+        console.log('[TeacherRoom] Kick participant:', participantId);
+        if (jitsiApiRef.current) {
+            jitsiApiRef.current.executeCommand('kickParticipant', participantId);
+        }
+        // Also remove from local state
+        setParticipants((prev) => prev.filter((p) => p.id !== participantId));
+    }, []);
+
     if (!roomName) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -89,6 +135,7 @@ export function TeacherRoom() {
                         onParticipantJoined={handleParticipantJoined}
                         onParticipantLeft={handleParticipantLeft}
                         onMeetingEnd={handleMeetingEnd}
+                        onReady={handleJitsiReady}
                         className="h-full"
                     />
                 </div>
@@ -99,7 +146,11 @@ export function TeacherRoom() {
                 sessionId={apiSessionId || roomName}
                 participants={participants}
                 onEndSession={handleEndSession}
+                onShareScreen={handleShareScreen}
+                onMuteAll={handleMuteAll}
+                onKickParticipant={handleKickParticipant}
             />
         </div>
     );
 }
+

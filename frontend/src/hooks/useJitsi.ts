@@ -208,12 +208,17 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         });
 
         apiRef.current = api;
+        
+        // Expose API globally for moderator controls
+        (window as { jitsiApi?: typeof api }).jitsiApi = api;
     }, [roomName, displayName, password, role, isTeacher, onParticipantJoined, onParticipantLeft, onMeetingEnd, onReady, containerRef]);
 
     const dispose = useCallback(() => {
         if (apiRef.current) {
             apiRef.current.dispose();
             apiRef.current = null;
+            // Clean up global reference
+            (window as { jitsiApi?: unknown }).jitsiApi = undefined;
             setIsReady(false);
             setParticipants([]);
         }

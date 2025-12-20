@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Users, HelpCircle, Shuffle, X, ChevronRight } from 'lucide-react';
+import { Users, HelpCircle, Shuffle, X, ChevronRight, Monitor, MicOff, UserX } from 'lucide-react';
 import { useTeacherFeedback } from '@/hooks/useFeedback';
 import type { Participant } from '@/types';
 
@@ -7,13 +7,24 @@ interface TeacherPanelProps {
     sessionId: string;
     participants: Participant[];
     onEndSession?: () => void;
+    onShareScreen?: () => void;
+    onMuteAll?: () => void;
+    onKickParticipant?: (participantId: string) => void;
 }
 
-export function TeacherPanel({ sessionId, participants, onEndSession }: TeacherPanelProps) {
+export function TeacherPanel({ 
+    sessionId, 
+    participants, 
+    onEndSession,
+    onShareScreen,
+    onMuteAll,
+    onKickParticipant,
+}: TeacherPanelProps) {
     const [isOpen, setIsOpen] = useState(true);
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+    const [isSharing, setIsSharing] = useState(false);
 
-    const { confusedStudents, confusedCount, pickRandomStudent } = useTeacherFeedback({
+    const { confusedStudents, confusedCount } = useTeacherFeedback({
         sessionId,
         enabled: true,
     });
@@ -28,6 +39,23 @@ export function TeacherPanel({ sessionId, participants, onEndSession }: TeacherP
         // Clear selection after 5 seconds
         setTimeout(() => setSelectedStudent(null), 5000);
     }, [participants]);
+
+    const handleShareScreen = useCallback(() => {
+        setIsSharing(!isSharing);
+        onShareScreen?.();
+    }, [isSharing, onShareScreen]);
+
+    const handleMuteAll = useCallback(() => {
+        if (window.confirm('Silenciar todos os participantes?')) {
+            onMuteAll?.();
+        }
+    }, [onMuteAll]);
+
+    const handleKickParticipant = useCallback((participantId: string, displayName: string) => {
+        if (window.confirm(`Remover "${displayName}" da aula?`)) {
+            onKickParticipant?.(participantId);
+        }
+    }, [onKickParticipant]);
 
     if (!isOpen) {
         return (
@@ -85,8 +113,36 @@ export function TeacherPanel({ sessionId, participants, onEndSession }: TeacherP
                 </div>
             )}
 
-            {/* Actions */}
-            <div className="p-4 border-b">
+            {/* Moderator Controls */}
+            <div className="p-4 border-b space-y-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                    Controles do Professor
+                </p>
+                
+                {/* Share Screen Button */}
+                <button
+                    onClick={handleShareScreen}
+                    className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors ${
+                        isSharing 
+                            ? 'bg-green-500 text-white hover:bg-green-600' 
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                >
+                    <Monitor className="w-5 h-5" />
+                    {isSharing ? 'Parar Compartilhamento' : 'Compartilhar Tela'}
+                </button>
+
+                {/* Mute All Button */}
+                <button
+                    onClick={handleMuteAll}
+                    disabled={participants.length === 0}
+                    className="w-full flex items-center justify-center gap-2 bg-orange-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <MicOff className="w-5 h-5" />
+                    Silenciar Todos
+                </button>
+
+                {/* Random Pick Button */}
                 <button
                     onClick={handlePickRandom}
                     disabled={participants.length === 0}
@@ -113,8 +169,9 @@ export function TeacherPanel({ sessionId, participants, onEndSession }: TeacherP
                             return (
                                 <li
                                     key={participant.id}
-                                    className={`flex items-center gap-3 p-3 rounded-lg ${isConfused ? 'bg-cyan-50 border border-cyan-200' : 'bg-gray-50'
-                                        }`}
+                                    className={`flex items-center gap-3 p-3 rounded-lg ${
+                                        isConfused ? 'bg-cyan-50 border border-cyan-200' : 'bg-gray-50'
+                                    }`}
                                 >
                                     <div className="w-8 h-8 rounded-full bg-navy-900 text-white flex items-center justify-center text-sm font-medium">
                                         {participant.displayName.charAt(0).toUpperCase()}
@@ -125,6 +182,15 @@ export function TeacherPanel({ sessionId, participants, onEndSession }: TeacherP
                                     {isConfused && (
                                         <HelpCircle className="w-5 h-5 text-cyan-500" aria-label="Com dúvida" />
                                     )}
+                                    {/* Kick button */}
+                                    <button
+                                        onClick={() => handleKickParticipant(participant.id, participant.displayName)}
+                                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                        aria-label={`Remover ${participant.displayName}`}
+                                        title="Remover da aula"
+                                    >
+                                        <UserX className="w-4 h-4" />
+                                    </button>
                                 </li>
                             );
                         })
@@ -144,3 +210,4 @@ export function TeacherPanel({ sessionId, participants, onEndSession }: TeacherP
         </div>
     );
 }
+
