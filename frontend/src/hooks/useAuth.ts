@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
     signInWithEmailAndPassword,
+    signInAnonymously as firebaseSignInAnonymously,
     signOut as firebaseSignOut,
     onAuthStateChanged,
+    updateProfile,
     User
 } from 'firebase/auth';
 import { auth } from '../firebase';
@@ -12,6 +14,7 @@ interface UseAuthReturn {
     isLoading: boolean;
     error: string | null;
     signIn: (email: string, password: string) => Promise<void>;
+    signInAnonymously: (displayName: string) => Promise<void>;
     signOut: () => Promise<void>;
 }
 
@@ -44,6 +47,28 @@ export function useAuth(): UseAuthReturn {
         }
     }, []);
 
+    const signInAnonymously = useCallback(async (displayName: string) => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const result = await firebaseSignInAnonymously(auth);
+            if (result.user) {
+                await updateProfile(result.user, {
+                    displayName: displayName
+                });
+                // Force update user state
+                setUser({ ...result.user, displayName });
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Erro ao entrar como convidado';
+            setError(message);
+            throw err;
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
     const signOut = useCallback(async () => {
         setIsLoading(true);
         try {
@@ -60,6 +85,8 @@ export function useAuth(): UseAuthReturn {
         isLoading,
         error,
         signIn,
+        signInAnonymously,
         signOut,
     };
 }
+

@@ -1,32 +1,42 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Video, LogIn } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 export function LoginPage() {
     const navigate = useNavigate();
+    const { signInAnonymously } = useAuth();
     const [role, setRole] = useState<'teacher' | 'student'>('student');
     const [name, setName] = useState('');
     const [sessionCode, setSessionCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
 
         setIsLoading(true);
+        setError(null);
 
-        // Simulate login/fetch session
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        try {
+            // Authenticate effectively
+            await signInAnonymously(name);
 
-        if (role === 'teacher') {
-            navigate('/teacher');
-        } else {
-            // For student, sessionCode is required
-            if (!sessionCode.trim()) {
-                setIsLoading(false);
-                return;
+            if (role === 'teacher') {
+                navigate('/teacher');
+            } else {
+                // For student, sessionCode is required
+                if (!sessionCode.trim()) {
+                    setIsLoading(false);
+                    return;
+                }
+                navigate(`/student/room/${sessionCode}?name=${encodeURIComponent(name)}`);
             }
-            navigate(`/student/room/${sessionCode}?name=${encodeURIComponent(name)}`);
+        } catch (err) {
+            console.error('Login error:', err);
+            setError('Erro ao entrar. Tente novamente.');
+            setIsLoading(false);
         }
     };
 
@@ -69,6 +79,12 @@ export function LoginPage() {
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        {error && (
+                            <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center">
+                                {error}
+                            </div>
+                        )}
+
                         <div>
                             <label
                                 htmlFor="name"
@@ -132,3 +148,4 @@ export function LoginPage() {
         </div>
     );
 }
+
