@@ -119,18 +119,44 @@ export function TeacherPanel({
                     Controles do Professor
                 </p>
                 
-                {/* Share Screen Button */}
+                {/* Pop-out Student Monitor Button */}
                 <button
-                    onClick={handleShareScreen}
-                    className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors ${
-                        isSharing 
-                            ? 'bg-green-500 text-white hover:bg-green-600' 
-                            : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
+                    onClick={() => {
+                        const width = 320;
+                        const height = 480;
+                        const left = window.screen.width - width;
+                        const top = 0;
+                        window.open(
+                            `/teacher/monitor/${sessionId}?name=Professor`,
+                            'StudentMonitor',
+                            `width=${width},height=${height},left=${left},top=${top},resizable=yes`
+                        );
+                    }}
+                    className="w-full flex items-center justify-center gap-2 bg-purple-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-purple-600 transition-colors"
+                    title="Abre uma janela flutuante com os alunos para sobrepor ao ActiveInspire"
                 >
-                    <Monitor className="w-5 h-5" />
-                    {isSharing ? 'Parar Compartilhamento' : 'Compartilhar Tela'}
+                    <Users className="w-5 h-5" />
+                    👁️ Pop-out Alunos
                 </button>
+
+                {/* Share Screen Button with Audio Tip */}
+                <div className="relative group">
+                    <button
+                        onClick={handleShareScreen}
+                        className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors ${
+                            isSharing 
+                                ? 'bg-green-500 text-white hover:bg-green-600' 
+                                : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                    >
+                        <Monitor className="w-5 h-5" />
+                        {isSharing ? 'Parar Compartilhamento' : 'Compartilhar Tela'}
+                    </button>
+                    {/* Audio Sharing Tooltip */}
+                    <div className="hidden group-hover:block absolute left-0 right-0 top-full mt-1 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10">
+                        💡 <strong>Dica:</strong> Para compartilhar áudio (listening), selecione "Tela inteira" e marque "Compartilhar áudio".
+                    </div>
+                </div>
 
                 {/* Mute All Button */}
                 <button

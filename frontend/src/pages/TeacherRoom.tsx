@@ -73,8 +73,14 @@ export function TeacherRoom() {
             // Store reference to execute commands
             jitsiApiRef.current = window.jitsiApi || null;
         }
+        
+        // Save room name to localStorage for StudentMonitorPage
+        if (roomName && apiSessionId) {
+            localStorage.setItem(`session_${apiSessionId}_roomName`, roomName);
+        }
+        
         console.log('[TeacherRoom] Jitsi ready');
-    }, []);
+    }, [roomName, apiSessionId]);
 
     // Moderator controls
     const handleShareScreen = useCallback(() => {
