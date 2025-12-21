@@ -85,24 +85,31 @@ export function TeacherRoom() {
             const style = pip.document.createElement('style');
             style.textContent = `
                 * { margin: 0; padding: 0; box-sizing: border-box; }
-                body { 
+                html, body {
+                    width: 100% !important;
+                    height: 100% !important;
                     background: #1a1a2e; 
                     overflow: hidden;
                     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
                 }
                 #jitsi-container {
-                    width: 100%;
-                    height: 100%;
-                }
-                iframe {
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    right: 0 !important;
+                    bottom: 0 !important;
                     width: 100% !important;
                     height: 100% !important;
-                    border: none;
                 }
-                /* Compact mode styles when screen sharing */
-                body.compact-mode #jitsi-container {
-                    width: 100%;
-                    height: 100%;
+                #jitsi-container > iframe,
+                #jitsi-container iframe {
+                    position: absolute !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    width: 100% !important;
+                    height: 100% !important;
+                    min-height: 100% !important;
+                    border: none !important;
                 }
             `;
             pip.document.head.appendChild(style);
