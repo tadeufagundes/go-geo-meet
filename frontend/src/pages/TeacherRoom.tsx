@@ -150,6 +150,7 @@ export function TeacherRoom() {
             {/* Teacher panel */}
             <TeacherPanel
                 sessionId={apiSessionId || roomName}
+                roomName={roomName}
                 participants={participants}
                 onEndSession={handleEndSession}
                 onShareScreen={handleShareScreen}

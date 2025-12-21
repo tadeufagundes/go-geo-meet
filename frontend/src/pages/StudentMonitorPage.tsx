@@ -13,21 +13,13 @@ export function StudentMonitorPage() {
     const { sessionId } = useParams<{ sessionId: string }>();
     const [searchParams] = useSearchParams();
     const containerRef = useRef<HTMLDivElement>(null);
-    const [roomName, setRoomName] = useState<string>('');
 
+    // Get room name directly from URL query parameter (passed by TeacherPanel)
+    const roomName = searchParams.get('room') || '';
     const displayName = searchParams.get('name') || 'Professor (Monitor)';
 
-    // Get room name from session
-    useEffect(() => {
-        // Try to get room name from localStorage (set by TeacherRoom)
-        const storedRoomName = localStorage.getItem(`session_${sessionId}_roomName`);
-        if (storedRoomName) {
-            setRoomName(storedRoomName);
-        }
-    }, [sessionId]);
-
     const { isReady, participants } = useJitsi(containerRef, {
-        roomName: roomName || `GoGeo-Monitor-${sessionId}`,
+        roomName: roomName,
         displayName: `${displayName} (Monitor)`,
         role: 'teacher',
     });

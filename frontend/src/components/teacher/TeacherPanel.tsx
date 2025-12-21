@@ -5,6 +5,7 @@ import type { Participant } from '@/types';
 
 interface TeacherPanelProps {
     sessionId: string;
+    roomName: string;
     participants: Participant[];
     onEndSession?: () => void;
     onShareScreen?: () => void;
@@ -13,7 +14,8 @@ interface TeacherPanelProps {
 }
 
 export function TeacherPanel({ 
-    sessionId, 
+    sessionId,
+    roomName,
     participants, 
     onEndSession,
     onShareScreen,
@@ -127,7 +129,7 @@ export function TeacherPanel({
                         const left = window.screen.width - width;
                         const top = 0;
                         window.open(
-                            `/teacher/monitor/${sessionId}?name=Professor`,
+                            `/teacher/monitor/${sessionId}?name=Professor&room=${encodeURIComponent(roomName)}`,
                             'StudentMonitor',
                             `width=${width},height=${height},left=${left},top=${top},resizable=yes`
                         );
