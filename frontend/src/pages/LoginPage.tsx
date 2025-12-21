@@ -1,41 +1,46 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Video, LogIn } from 'lucide-react';
+import { Video, LogIn, Mail, Lock, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export function LoginPage() {
     const navigate = useNavigate();
-    const { signInAnonymously } = useAuth();
+    const { signIn, signInAnonymously } = useAuth();
     const [role, setRole] = useState<'teacher' | 'student'>('student');
+    
+    // Form states
     const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [sessionCode, setSessionCode] = useState('');
+    
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name.trim()) return;
-
         setIsLoading(true);
         setError(null);
 
         try {
-            // Authenticate effectively
-            await signInAnonymously(name);
-
             if (role === 'teacher') {
+                if (!email || !password) return;
+                // Teacher Login: Email & Password (same as Synapse)
+                await signIn(email, password);
                 navigate('/teacher');
             } else {
-                // For student, sessionCode is required
-                if (!sessionCode.trim()) {
-                    setIsLoading(false);
-                    return;
-                }
+                if (!name || !sessionCode) return;
+                // Student Login: Anonymous with Name
+                await signInAnonymously(name);
                 navigate(`/student/room/${sessionCode}?name=${encodeURIComponent(name)}`);
             }
         } catch (err) {
             console.error('Login error:', err);
-            setError('Erro ao entrar. Tente novamente.');
+            if (role === 'teacher') {
+                setError('Erro ao entrar. Verifique seu e-mail e senha.');
+            } else {
+                setError('Erro ao entrar na aula. O login anônimo pode estar desativado no Firebase.');
+            }
             setIsLoading(false);
         }
     };
@@ -85,47 +90,80 @@ export function LoginPage() {
                             </div>
                         )}
 
-                        <div>
-                            <label
-                                htmlFor="name"
-                                className="block text-sm font-medium text-gray-700 mb-1"
-                            >
-                                Seu nome
-                            </label>
-                            <input
-                                type="text"
-                                id="name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="Digite seu nome"
-                                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
-                                required
-                            />
-                        </div>
-
-                        {role === 'student' && (
-                            <div>
-                                <label
-                                    htmlFor="sessionCode"
-                                    className="block text-sm font-medium text-gray-700 mb-1"
-                                >
-                                    Código da aula
-                                </label>
-                                <input
-                                    type="text"
-                                    id="sessionCode"
-                                    value={sessionCode}
-                                    onChange={(e) => setSessionCode(e.target.value)}
-                                    placeholder="Ex: GoGeo-MAT7A-abc123"
-                                    className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
-                                    required
-                                />
-                            </div>
+                        {role === 'teacher' ? (
+                            // Teacher Form Fields
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        E-mail
+                                    </label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="seu@email.com"
+                                            className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Senha
+                                    </label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="Sua senha"
+                                            className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            // Student Form Fields
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Seu nome
+                                    </label>
+                                    <div className="relative">
+                                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                            placeholder="Digite seu nome"
+                                            className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Código da aula
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={sessionCode}
+                                        onChange={(e) => setSessionCode(e.target.value)}
+                                        placeholder="Ex: GoGeo-MAT7A-abc123"
+                                        className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
+                                        required
+                                    />
+                                </div>
+                            </>
                         )}
 
                         <button
                             type="submit"
-                            disabled={isLoading || !name.trim() || (role === 'student' && !sessionCode.trim())}
+                            disabled={isLoading}
                             className="w-full flex items-center justify-center gap-2 bg-cyan-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading ? (
@@ -133,7 +171,7 @@ export function LoginPage() {
                             ) : (
                                 <>
                                     <LogIn className="w-5 h-5" />
-                                    {role === 'teacher' ? 'Entrar no Painel' : 'Entrar na Aula'}
+                                    {role === 'teacher' ? 'Entrar com Email' : 'Entrar na Aula'}
                                 </>
                             )}
                         </button>
@@ -148,4 +186,5 @@ export function LoginPage() {
         </div>
     );
 }
+
 
