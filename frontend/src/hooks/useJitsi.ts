@@ -40,7 +40,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
     const initJitsi = useCallback(() => {
         if (!containerRef.current || apiRef.current) return;
 
-        const domain = 'beta.meet.jit.si';
+        const domain = 'meet.guifi.net';
 
         // ============================================
         // Configurações diferenciadas por ROLE
@@ -67,8 +67,8 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         ];
 
         const studentToolbarButtons = [
-            'microphone',
-            'camera',
+            // 'microphone' REMOVIDO - Aluno não pode se mutar
+            // 'camera' REMOVIDO - Aluno não pode desligar camera (solicitação do usuário)
             // 'desktop' REMOVIDO - Aluno NÃO pode compartilhar tela
             'fullscreen',
             'fodeviceselection',
@@ -81,10 +81,12 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
             'settings',
         ];
 
+
+
         // Config overwrite - Permissões do Jitsi
         const baseConfig = {
             prejoinPageEnabled: false,
-            startWithAudioMuted: true,
+            startWithAudioMuted: false, // Forçar áudio ligado
             startWithVideoMuted: false,
             disableDeepLinking: true,
             enableClosePage: false,
@@ -257,6 +259,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
             console.warn('[Jitsi] Only teachers can share screen');
             return;
         }
+        console.log('[Jitsi] Executing toggleShareScreen');
         apiRef.current?.executeCommand('toggleShareScreen');
     }, [isTeacher]);
 
@@ -265,6 +268,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
             console.warn('[Jitsi] Only teachers can mute everyone');
             return;
         }
+        console.log('[Jitsi] Executing muteEveryone');
         apiRef.current?.executeCommand('muteEveryone');
     }, [isTeacher]);
 
@@ -285,16 +289,25 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         apiRef.current?.executeCommand('kickParticipant', participantId);
     }, [isTeacher]);
 
+    // Configuration
+    const JITSI_DOMAIN = 'meet.guifi.net';
+
     useEffect(() => {
-        // Wait for Jitsi API to load
-        const checkJitsiAPI = () => {
+        // Function to load Jitsi script dynamically
+        const loadJitsiScript = () => {
             if (window.JitsiMeetExternalAPI) {
                 initJitsi();
-            } else {
-                setTimeout(checkJitsiAPI, 100);
+                return;
             }
+
+            const script = document.createElement('script');
+            script.src = `https://${JITSI_DOMAIN}/external_api.js`;
+            script.async = true;
+            script.onload = () => initJitsi();
+            document.body.appendChild(script);
         };
-        checkJitsiAPI();
+
+        loadJitsiScript();
 
         return () => {
             dispose();
