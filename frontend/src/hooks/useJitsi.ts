@@ -40,7 +40,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
     const initJitsi = useCallback(() => {
         if (!containerRef.current || apiRef.current) return;
 
-        const domain = 'meet.jit.si';
+        const domain = 'beta.meet.jit.si';
 
         // ============================================
         // Configurações diferenciadas por ROLE
