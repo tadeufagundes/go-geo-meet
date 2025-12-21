@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { TeacherPanel } from '../components/teacher/TeacherPanel';
 import * as sessionService from '../services/sessionService';
 import type { Participant } from '../types';
 
@@ -367,17 +366,6 @@ export function TeacherRoom() {
                     )}
                 </div>
             </div>
-
-            {/* Teacher panel */}
-            <TeacherPanel
-                sessionId={apiSessionId || roomName}
-                roomName={roomName}
-                participants={participants}
-                onEndSession={handleEndSession}
-                onShareScreen={handleShareScreen}
-                onMuteAll={handleMuteAll}
-                onKickParticipant={handleKickParticipant}
-            />
         </div>
     );
 }
