@@ -162,16 +162,16 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
 
         // Set password se for professor e tiver senha
         if (password && isTeacher) {
-            api.addListener('participantRoleChanged', (event: { id: string; role: string }) => {
+            api.addListener('participantRoleChanged', ((event: { id: string; role: string }) => {
                 if (event.role === 'moderator') {
                     api.executeCommand('password', password);
                     console.log('[Jitsi] Password set by moderator');
                 }
-            });
+            }) as unknown as () => void);
         }
 
         // Quando o professor entrar, torná-lo moderador
-        api.addListener('videoConferenceJoined', (event: { id: string }) => {
+        api.addListener('videoConferenceJoined', ((event: { id: string }) => {
             console.log('[Jitsi] videoConferenceJoined event fired', event);
             setIsReady(true);
             
@@ -181,7 +181,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
             }
             
             onReady?.();
-        });
+        }) as unknown as () => void);
 
         // Failsafe: Se o evento não disparar em 5 segundos, libera a tela
         setTimeout(() => {
@@ -195,7 +195,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         }, 5000);
 
         // Participant joined
-        api.addListener('participantJoined', (event: { id: string; displayName: string }) => {
+        api.addListener('participantJoined', ((event: { id: string; displayName: string }) => {
             const participant: Participant = {
                 id: event.id,
                 displayName: event.displayName || 'Participante',
@@ -203,14 +203,14 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
             setParticipants((prev) => [...prev, participant]);
             onParticipantJoined?.(participant);
             console.log('[Jitsi] Participant joined:', participant.displayName);
-        });
+        }) as unknown as () => void);
 
         // Participant left
-        api.addListener('participantLeft', (event: { id: string }) => {
+        api.addListener('participantLeft', ((event: { id: string }) => {
             setParticipants((prev) => prev.filter((p) => p.id !== event.id));
             onParticipantLeft?.(event.id);
             console.log('[Jitsi] Participant left:', event.id);
-        });
+        }) as unknown as () => void);
 
         // Meeting ended
         api.addListener('readyToClose', () => {
@@ -219,11 +219,11 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         });
 
         // Screen sharing started/stopped (para debug)
-        api.addListener('screenSharingStatusChanged', (event: { on: boolean; participantId: string }) => {
+        api.addListener('screenSharingStatusChanged', ((event: { on: boolean; participantId: string }) => {
             console.log('[Jitsi] Screen sharing:', event.on ? 'started' : 'stopped', 'by', event.participantId);
-        });
+        }) as unknown as () => void);
 
-        apiRef.current = api;
+        apiRef.current = api as unknown as JitsiMeetExternalAPI;
         
         // Expose API globally for moderator controls
         (window as { jitsiApi?: typeof api }).jitsiApi = api;
