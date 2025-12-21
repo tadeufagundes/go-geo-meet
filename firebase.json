@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "target": "meet",
+    "site": "gogeomeet",
     "public": "frontend/dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [

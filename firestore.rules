@@ -6,16 +6,11 @@ service cloud.firestore {
     // Meet Sessions
     // ============================================
     match /meetSessions/{sessionId} {
-      // Anyone can read sessions (to join)
+      // Allow read for everyone (needed for students to join)
       allow read: if true;
       
-      // Only authenticated users can create sessions
-      allow create: if request.auth != null
-        && request.resource.data.teacherId == request.auth.uid;
-      
-      // Only the teacher who created can update
-      allow update: if request.auth != null 
-        && resource.data.teacherId == request.auth.uid;
+      // Allow create/update for any authenticated user (Teachers)
+      allow create, update: if request.auth != null;
       
       // No delete allowed
       allow delete: if false;

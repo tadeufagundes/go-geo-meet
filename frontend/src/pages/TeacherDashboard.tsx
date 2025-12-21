@@ -7,7 +7,7 @@ import * as sessionService from '../services/sessionService';
 
 export function TeacherDashboard() {
     const navigate = useNavigate();
-    const { user, signOut } = useAuth();
+    const { user, isLoading: isAuthLoading, signOut } = useAuth();
     const { sessions, isLoading: isLoadingSessions, error, fetchSessions } = useSessions();
 
     const [isCreating, setIsCreating] = useState(false);
@@ -15,10 +15,21 @@ export function TeacherDashboard() {
 
     // Redirect if not authenticated
     useEffect(() => {
-        if (!user) {
+        if (!isAuthLoading && !user) {
             navigate('/login');
         }
-    }, [user, navigate]);
+    }, [user, isAuthLoading, navigate]);
+
+    if (isAuthLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-gray-500">Carregando...</p>
+                </div>
+            </div>
+        );
+    }
 
     const handleCreateSession = async () => {
         if (!newSessionTurma.trim()) return;

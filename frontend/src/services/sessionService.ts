@@ -52,7 +52,8 @@ export interface SessionDTO {
  * Generate a secure room name for Jitsi.
  */
 function generateRoomName(turmaName: string): string {
-    const turmaShort = turmaName.replace(/\s+/g, '').substring(0, 10).toUpperCase();
+    // Remove special characters, keep only alphanumeric and hyphens
+    const turmaShort = turmaName.replace(/[^a-zA-Z0-9-]/g, '').substring(0, 15).toUpperCase();
     const timestamp = Date.now().toString(36);
     const random = uuidv4().substring(0, 8);
     return `GoGeo-${turmaShort}-${timestamp}-${random}`;

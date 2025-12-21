@@ -168,6 +168,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
 
         // Quando o professor entrar, torná-lo moderador
         api.addListener('videoConferenceJoined', (event: { id: string }) => {
+            console.log('[Jitsi] videoConferenceJoined event fired', event);
             setIsReady(true);
             
             if (isTeacher) {
@@ -177,6 +178,17 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
             
             onReady?.();
         });
+
+        // Failsafe: Se o evento não disparar em 5 segundos, libera a tela
+        setTimeout(() => {
+            setIsReady((prev) => {
+                if (!prev) {
+                    console.warn('[Jitsi] Failsafe: forcing ready state after 5s');
+                    return true;
+                }
+                return prev;
+            });
+        }, 5000);
 
         // Participant joined
         api.addListener('participantJoined', (event: { id: string; displayName: string }) => {
