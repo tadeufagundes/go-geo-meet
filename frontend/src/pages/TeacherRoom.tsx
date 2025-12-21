@@ -137,6 +137,10 @@ export function TeacherRoom() {
                         disableInviteFunctions: true,
                         enableWelcomePage: false,
                         disableRemoteMute: false,
+                        // Force tile view as default (fills the whole window)
+                        startInTileView: true,
+                        // Disable filmstrip to maximize video space
+                        disableFilmstripAutohiding: true,
                         remoteVideoMenu: {
                             disableKick: false,
                             disableGrantModerator: false,
@@ -154,10 +158,12 @@ export function TeacherRoom() {
                             'hangup', 'chat', 'raisehand', 'tileview',
                             'mute-everyone', 'participants-pane',
                         ],
-                        FILM_STRIP_MAX_HEIGHT: 120,
-                        VERTICAL_FILMSTRIP: true,
+                        // Remove filmstrip constraints - let tile view use full space
+                        DISABLE_VIDEO_BACKGROUND: true,
                         DEFAULT_BACKGROUND: '#1a1a2e',
-                        TOOLBAR_ALWAYS_VISIBLE: false, // Hide toolbar when not hovering
+                        TOOLBAR_ALWAYS_VISIBLE: false,
+                        // Force tile view layout
+                        TILE_VIEW_MAX_COLUMNS: 2,
                     },
                 });
 
