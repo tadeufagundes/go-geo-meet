@@ -131,11 +131,19 @@ export function TeacherPanel({
                         }
 
                         try {
-                            // Find the Jitsi iframe container
-                            const jitsiContainer = document.querySelector('[id^="jitsiMeet"]') as HTMLElement;
+                            // Find the Jitsi iframe container (uses class, not ID)
+                            const jitsiContainer = document.querySelector('.jitsi-container') as HTMLElement;
                             if (!jitsiContainer) {
                                 console.error('[PiP] Jitsi container not found');
-                                alert('Erro: Container de vídeo não encontrado. Aguarde a sala carregar.');
+                                alert('Erro: Container de vídeo não encontrado. Aguarde a sala carregar completamente.');
+                                return;
+                            }
+
+                            // Find the actual iframe inside the container
+                            const jitsiIframe = jitsiContainer.querySelector('iframe');
+                            if (!jitsiIframe) {
+                                console.error('[PiP] Jitsi iframe not found inside container');
+                                alert('Erro: Iframe de vídeo não encontrado. Aguarde a sala carregar completamente.');
                                 return;
                             }
 
