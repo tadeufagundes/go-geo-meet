@@ -132,8 +132,8 @@ export function TeacherRoom() {
                     </div>
                 </header>
 
-                {/* Jitsi container */}
-                <div className="flex-1">
+                {/* Jitsi container - Has class for PiP return */}
+                <div className="flex-1 jitsi-main-container">
                     <JitsiMeet
                         roomName={roomName}
                         displayName={teacherName}

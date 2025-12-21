@@ -121,24 +121,84 @@ export function TeacherPanel({
                     Controles do Professor
                 </p>
                 
-                {/* Pop-out Student Monitor Button */}
+                {/* Pop-out Student Monitor Button - Uses Document Picture-in-Picture API */}
                 <button
-                    onClick={() => {
-                        const width = 320;
-                        const height = 480;
-                        const left = window.screen.width - width;
-                        const top = 0;
-                        window.open(
-                            `/teacher/monitor/${sessionId}?name=Professor&room=${encodeURIComponent(roomName)}`,
-                            'StudentMonitor',
-                            `width=${width},height=${height},left=${left},top=${top},resizable=yes`
-                        );
+                    onClick={async () => {
+                        // Check if Document PiP is supported
+                        if (!('documentPictureInPicture' in window)) {
+                            alert('Seu navegador não suporta janela flutuante. Use Chrome versão 116 ou superior para essa funcionalidade.');
+                            return;
+                        }
+
+                        try {
+                            // Find the Jitsi iframe container
+                            const jitsiContainer = document.querySelector('[id^="jitsiMeet"]') as HTMLElement;
+                            if (!jitsiContainer) {
+                                console.error('[PiP] Jitsi container not found');
+                                alert('Erro: Container de vídeo não encontrado. Aguarde a sala carregar.');
+                                return;
+                            }
+
+                            // Request a Document Picture-in-Picture window
+                            const pipWindow = await (window as unknown as { documentPictureInPicture: { requestWindow: (opts: { width: number; height: number }) => Promise<Window> } }).documentPictureInPicture.requestWindow({
+                                width: 400,
+                                height: 300,
+                            });
+
+                            // Copy styles to the PiP window
+                            const styles = document.querySelectorAll('link[rel="stylesheet"], style');
+                            styles.forEach((style) => {
+                                pipWindow.document.head.appendChild(style.cloneNode(true));
+                            });
+
+                            // Add some inline styles for the PiP window
+                            const styleEl = pipWindow.document.createElement('style');
+                            styleEl.textContent = `
+                                body { 
+                                    margin: 0; 
+                                    padding: 0; 
+                                    background: #1a1a2e; 
+                                    overflow: hidden;
+                                }
+                                #pip-container {
+                                    width: 100%;
+                                    height: 100%;
+                                }
+                                iframe {
+                                    width: 100% !important;
+                                    height: 100% !important;
+                                    border: none;
+                                }
+                            `;
+                            pipWindow.document.head.appendChild(styleEl);
+
+                            // Create container in PiP window
+                            const pipContainer = pipWindow.document.createElement('div');
+                            pipContainer.id = 'pip-container';
+                            pipWindow.document.body.appendChild(pipContainer);
+
+                            // MOVE (not copy) the Jitsi container to PiP window
+                            pipContainer.appendChild(jitsiContainer);
+
+                            // When PiP window closes, move Jitsi back
+                            pipWindow.addEventListener('pagehide', () => {
+                                const mainContainer = document.querySelector('.jitsi-main-container');
+                                if (mainContainer && jitsiContainer) {
+                                    mainContainer.appendChild(jitsiContainer);
+                                }
+                            });
+
+                            console.log('[PiP] Document Picture-in-Picture opened successfully');
+                        } catch (error) {
+                            console.error('[PiP] Error opening Picture-in-Picture:', error);
+                            alert('Erro ao abrir janela flutuante. Tente novamente.');
+                        }
                     }}
                     className="w-full flex items-center justify-center gap-2 bg-purple-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-purple-600 transition-colors"
-                    title="Abre uma janela flutuante com os alunos para sobrepor ao ActiveInspire"
+                    title="Abre uma janela flutuante SEMPRE NO TOPO com os alunos"
                 >
                     <Users className="w-5 h-5" />
-                    👁️ Pop-out Alunos
+                    👁️ Flutuar Alunos (PiP)
                 </button>
 
                 {/* Share Screen Button with Audio Tip */}
