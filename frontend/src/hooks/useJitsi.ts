@@ -23,6 +23,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
     const apiRef = useRef<JitsiMeetExternalAPI | null>(null);
     const [isReady, setIsReady] = useState(false);
     const [participants, setParticipants] = useState<Participant[]>([]);
+    const [currentDomain, setCurrentDomain] = useState<string>('');
 
     const {
         roomName,
@@ -37,10 +38,11 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
 
     const isTeacher = role === 'teacher';
 
-    const initJitsi = useCallback(() => {
+    const initJitsi = useCallback((domain: string) => {
+        console.log(`[Jitsi] Initializing with server: ${domain}`);
         if (!containerRef.current || apiRef.current) return;
 
-        const domain = 'meet.guifi.net';
+        setCurrentDomain(domain);
 
         // ============================================
         // Configurações diferenciadas por ROLE
@@ -67,7 +69,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         ];
 
         const studentToolbarButtons = [
-            // 'microphone' REMOVIDO - Aluno não pode se mutar
+            'microphone',
             // 'camera' REMOVIDO - Aluno não pode desligar camera (solicitação do usuário)
             // 'desktop' REMOVIDO - Aluno NÃO pode compartilhar tela
             'fullscreen',
@@ -86,7 +88,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         // Config overwrite - Permissões do Jitsi
         const baseConfig = {
             prejoinPageEnabled: false,
-            startWithAudioMuted: false, // Forçar áudio ligado
+            startWithAudioMuted: true,
             startWithVideoMuted: false,
             disableDeepLinking: true,
             enableClosePage: false,
@@ -289,25 +291,50 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         apiRef.current?.executeCommand('kickParticipant', participantId);
     }, [isTeacher]);
 
-    // Configuration
-    const JITSI_DOMAIN = 'meet.guifi.net';
+    // Server Configuration with Fallback
+    const JITSI_SERVERS = [
+        'meet.ffmuc.net',           // Primary: Freifunk München (Alemanha - melhor infra)
+        'jitsi.hamburg.ccc.de',     // Fallback: CCC Hamburg (Alemanha)
+    ];
 
     useEffect(() => {
-        // Function to load Jitsi script dynamically
-        const loadJitsiScript = () => {
+        let serverIndex = 0;
+
+        // Function to load Jitsi script with fallback
+        const loadJitsiScript = (index: number) => {
+            if (index >= JITSI_SERVERS.length) {
+                console.error('[Jitsi] All servers failed to load');
+                return;
+            }
+
+            const domain = JITSI_SERVERS[index];
+            console.log(`[Jitsi] Attempting to load from: ${domain}`);
+
+            // Check if API already loaded (from previous attempt with same domain)
             if (window.JitsiMeetExternalAPI) {
-                initJitsi();
+                initJitsi(domain);
                 return;
             }
 
             const script = document.createElement('script');
-            script.src = `https://${JITSI_DOMAIN}/external_api.js`;
+            script.src = `https://${domain}/external_api.js`;
             script.async = true;
-            script.onload = () => initJitsi();
+            
+            script.onload = () => {
+                console.log(`[Jitsi] Successfully loaded API from: ${domain}`);
+                initJitsi(domain);
+            };
+            
+            script.onerror = () => {
+                console.warn(`[Jitsi] Failed to load from ${domain}, trying fallback...`);
+                document.body.removeChild(script);
+                loadJitsiScript(index + 1);
+            };
+            
             document.body.appendChild(script);
         };
 
-        loadJitsiScript();
+        loadJitsiScript(serverIndex);
 
         return () => {
             dispose();
