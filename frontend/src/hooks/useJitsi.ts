@@ -107,6 +107,13 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
                     }
                 }
             },
+            // Configurações de lobby e autenticação
+            lobby: {
+                autoKnock: true,
+                enableChat: false
+            },
+            enableLobbyChat: false,
+            hideLobbyButton: true,
             // Configurações de moderação
             disableRemoteMute: !isTeacher,  // Apenas professor pode mutar outros
             remoteVideoMenu: {
