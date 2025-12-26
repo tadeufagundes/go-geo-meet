@@ -90,11 +90,23 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
             prejoinPageEnabled: false,
             startWithAudioMuted: true,
             startWithVideoMuted: false,
+            startAudioOnly: false,           // FORÇAR: Não iniciar em modo audio-only
+            disableAudioLevels: false,
             disableDeepLinking: true,
             enableClosePage: false,
             disableInviteFunctions: true,
             enableWelcomePage: false,
             enableNoisyMicDetection: true,
+            // IMPORTANTE: Garantir que vídeo seja solicitado
+            constraints: {
+                video: {
+                    height: {
+                        ideal: 720,
+                        max: 1080,
+                        min: 240
+                    }
+                }
+            },
             // Configurações de moderação
             disableRemoteMute: !isTeacher,  // Apenas professor pode mutar outros
             remoteVideoMenu: {
