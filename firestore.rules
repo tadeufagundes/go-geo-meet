@@ -1,49 +1,442 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-  
+    
     // ============================================
-    // Meet Sessions
+    // FUNÇÕES DE SEGURANÇA
     // ============================================
-    match /meetSessions/{sessionId} {
-      // Allow read for everyone (needed for students to join)
-      allow read: if true;
-      
-      // Allow create/update for any authenticated user (Teachers)
-      allow create, update: if request.auth != null;
-      
-      // No delete allowed
-      allow delete: if false;
+    
+    // Funcao: verificar se esta autenticado
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Funcao: verificar se tem documento de usuario
+    function hasUserDoc() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    // Funcao: obter dados do usuario
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    // Funcao: verificar se e admin (com verificacao de existencia)
+    function isAdmin() {
+      return hasUserDoc() && (
+        getUserData().userType == 'Admin' || 
+        getUserData().userType == 'Super Admin' || 
+        getUserData().userType == 'super_admin'
+      );
+    }
+    
+    // Funcao: verificar se e Super Admin especificamente
+    function isSuperAdmin() {
+      return hasUserDoc() && (
+        getUserData().userType == 'Super Admin' || 
+        getUserData().userType == 'super_admin'
+      );
+    }
+    
+    // Funcao: verificar se e Diretor
+    function isDirector() {
+      return hasUserDoc() && (
+        getUserData().userType == 'director' || 
+        getUserData().userType == 'Diretor'
+      );
+    }
+    
+    // Funcao: verificar se e professor (com verificacao de existencia)
+    function isTeacher() {
+      return hasUserDoc() && (
+        getUserData().userType == 'Professor' || 
+        getUserData().userType == 'teacher'
+      );
+    }
+    
+    // Funcao: verificar se e aluno
+    function isStudent() {
+      return hasUserDoc() && (
+        getUserData().userType == 'Aluno' || 
+        getUserData().userType == 'student'
+      );
+    }
+    
+    // Funcao: verificar se e lider (qualquer tipo)
+    function isLeader() {
+      return hasUserDoc() && (
+        getUserData().userType == 'pedagogical_leader' ||
+        getUserData().userType == 'commercial_leader' ||
+        getUserData().userType == 'admin_leader'
+      );
+    }
+    
+    // Funcao: verificar se pode criar codigos de acesso
+    function canCreateCodes() {
+      return hasUserDoc() && (
+        getUserData().userType == 'super_admin' ||
+        getUserData().userType == 'Super Admin' ||
+        getUserData().userType == 'Admin' ||
+        getUserData().userType == 'director' ||
+        getUserData().userType == 'Diretor' ||
+        getUserData().userType == 'admin_leader'
+      );
+    }
+    
+    // Funcao: verificar se pode criar licoes
+    function canCreateLessons() {
+      return isTeacher() || isLeader() || isAdmin();
     }
     
     // ============================================
-    // Attendance Logs
+    // COLEÇÃO: USERS
     // ============================================
-    match /meetAttendance/{logId} {
-      // Anyone can read attendance
+    match /users/{userId} {
+      // Leitura: Apenas próprios dados OU se for admin/professor
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId || 
+        isAdmin() || 
+        isTeacher()
+      );
+      
+      // Criação: Apenas durante registro (próprio UID)
+      allow create: if isSignedIn() && (
+        request.auth.uid == userId &&
+        request.resource.data.uid == request.auth.uid
+      );
+      
+      // Atualização: Próprios dados (exceto userType) OU Super Admin pode tudo
+      allow update: if isSignedIn() && (
+        // Caso 1: Usuário atualiza próprios dados (mas não pode mudar userType)
+        (request.auth.uid == userId &&
+         request.resource.data.userType == resource.data.userType && // Não pode mudar tipo
+         request.resource.data.uid == resource.data.uid) || // Não pode mudar UID
+        
+        // Caso 2: Super Admin pode atualizar qualquer coisa (inclusive userType)
+        isSuperAdmin()
+      );
+      
+      // Deleção: Apenas admin
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // COLEÇÃO: ACCESS CODES
+    // ============================================
+    match /accessCodes/{code} {
+      // Leitura: Todos (necessário para validação no registro)
       allow read: if true;
       
-      // Anyone can create attendance (joining a session)
+      // Criacao/Delecao: Super Admin, Diretor, ou Lider ADM
+      allow create, delete: if canCreateCodes();
+      
+      // Atualização: Admin OU durante registro (marcar como usado)
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        request.resource.data.used == true &&
+        request.resource.data.usedBy == request.auth.uid &&
+        resource.data.used == false // Só pode marcar como usado se ainda não estava
+      );
+    }
+    
+    // ============================================
+    // COLEÇÃO: LEVELS (Sistema Antigo - Compatibilidade)
+    // ============================================
+    match /levels/{levelCode} {
+      // Leitura: Todos
+      allow read: if true;
+      
+      // Escrita: Apenas admin
+      allow write: if isAdmin();
+    }
+    
+    // ============================================
+    // COLEÇÃO: COURSES (Sistema Novo)
+    // ============================================
+    match /courses/{courseCode} {
+      // Leitura: Todos
+      allow read: if true;
+      
+      // Escrita: Apenas admin
+      allow write: if isAdmin();
+      
+      // Subcoleção: levels
+      match /levels/{levelCode} {
+        // Leitura: Todos
+        allow read: if true;
+        
+        // Escrita: Apenas admin
+        allow write: if isAdmin();
+      }
+    }
+    
+    // ============================================
+    // COLEÇÃO: LESSONS
+    // ============================================
+    match /lessons/{lessonId} {
+      // Leitura: Todos autenticados
+      allow read: if isSignedIn();
+      
+      // Criacao: Professores, Lideres, ou Admin
+      allow create: if canCreateLessons() && 
+        request.resource.data.teacherId == request.auth.uid;
+      
+      // Atualização/Deleção: Apenas professor dono OU admin
+      allow update, delete: if isTeacher() && 
+        resource.data.teacherId == request.auth.uid ||
+        isAdmin();
+    }
+    
+    // ============================================
+    // COLEÇÃO: STUDENT PROGRESS
+    // ============================================
+    match /studentProgress/{progressId} {
+      // Leitura e escrita: Qualquer usuário autenticado pode acessar documentos que começam com seu UID
+      // Professores e admins podem acessar tudo
+      allow read, write: if isSignedIn() && (
+        progressId.matches('^' + request.auth.uid + '_.*') ||
+        isTeacher() ||
+        isAdmin()
+      );
+    }
+    
+    // ============================================
+    // COLEÇÃO: WEEKLY RANKING
+    // ============================================
+    match /weeklyRanking/{weekKey} {
+      // Leitura: Todos autenticados
+      allow read: if isSignedIn();
+      
+      // Criação: Todos autenticados podem criar documento da semana
+      allow create: if isSignedIn();
+      
+      // Atualização: Apenas se modificar SOMENTE o próprio campo (UID)
+      // Impede aluno de alterar pontuação de outros
+      allow update: if isSignedIn() && 
+        // Verifica que só está modificando seu próprio campo
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([request.auth.uid]) &&
+        // E que os dados do seu campo contêm o UID correto
+        request.resource.data[request.auth.uid].keys().hasAll(['name', 'points', 'level', 'lastUpdate']);
+      
+      // Deleção: Apenas admin (para limpeza de semanas antigas)
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // COLEÇÃO: AUDIT LOGS (Logs de Auditoria)
+    // ============================================
+    match /auditLogs/{logId} {
+      // Leitura: Apenas admin
+      allow read: if isAdmin();
+      
+      // Criação: Todos autenticados podem criar logs
+      allow create: if isSignedIn() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // Atualização/Deleção: Nunca (logs são imutáveis)
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // COLEÇÃO: SECURITY LOGS (Logs de Segurança)
+    // ============================================
+    match /securityLogs/{logId} {
+      // Leitura: Apenas admin
+      allow read: if isAdmin();
+      
+      // Criação: Todos (inclui anonymous para detectar ataques)
       allow create: if true;
       
-      // Anyone can update their own attendance (for leftAt)
-      allow update: if true;
+      // Atualização/Deleção: Nunca
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // COLEÇÃO: NOTIFICATION TOKENS (Tokens FCM)
+    // ============================================
+    match /notificationTokens/{tokenId} {
+      // Leitura: Próprio usuário ou admin
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
       
-      // No delete
+      // Criação: Próprio usuário
+      allow create: if isSignedIn() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // Atualização: Próprio usuário ou admin (para cleanup de tokens inválidos)
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Deleção: Próprio usuário ou admin
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // ============================================
+    // COLEÇÃO: NOTIFICATION PREFERENCES (Preferências)
+    // ============================================
+    match /notificationPreferences/{userId} {
+      // Leitura: Próprio usuário ou admin
+      allow read: if isSignedIn() && (
+        userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Criação: Próprio usuário
+      allow create: if isSignedIn() && 
+        userId == request.auth.uid;
+      
+      // Atualização: Próprio usuário
+      allow update: if isSignedIn() && 
+        userId == request.auth.uid;
+      
+      // Deleção: Próprio usuário ou admin
+      allow delete: if isSignedIn() && (
+        userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+    
+    // ============================================
+    // COLEÇÃO: NOTIFICATION HISTORY (Histórico)
+    // ============================================
+    match /notificationHistory/{historyId} {
+      // Leitura: Próprio usuário ou admin
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Criação: Cloud Functions ou admin (via backend)
+      allow create: if isAdmin();
+      
+      // Atualização: Cloud Functions ou admin (para marcar como clicada)
+      allow update: if isAdmin();
+      
+      // Deleção: Apenas admin (para limpeza de histórico antigo)
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // COLEÇÃO: ACHIEVEMENTS (Conquistas)
+    // ============================================
+    match /achievements/{achievementId} {
+      // Leitura: Próprio usuário ou admin
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Criação: Sistema (backend) ou admin
+      allow create: if isAdmin();
+      
+      // Atualização/Deleção: Apenas admin
+      allow update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // COLEÇÃO: MISSIONS (Missões)
+    // ============================================
+    match /missions/{missionId} {
+      // Leitura: Próprio usuário ou admin
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Criação: Sistema ou admin
+      allow create: if isSignedIn() && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Atualização: Próprio usuário (para marcar como completa) ou admin
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Deleção: Apenas admin
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // COLEÇÃO: STUDENTS (Dados do Aluno)
+    // ============================================
+    match /students/{studentId} {
+      // Leitura: Próprio aluno, professores ou admin
+      allow read: if isSignedIn() && (
+        studentId == request.auth.uid ||
+        isTeacher() ||
+        isAdmin()
+      );
+      
+      // Criação: Próprio usuário durante registro
+      allow create: if isSignedIn() && 
+        studentId == request.auth.uid;
+      
+      // Atualização: Próprio usuário (para progresso, streak, XP)
+      allow update: if isSignedIn() && 
+        studentId == request.auth.uid;
+      
+      // Deleção: Apenas admin
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // GO GEO MEET - COLEÇÕES
+    // ============================================
+    
+    // ============================================
+    // COLEÇÃO: MEET SESSIONS
+    // ============================================
+    match /meetSessions/{sessionId} {
+      // Leitura: Todos (necessário para alunos entrarem)
+      allow read: if true;
+      
+      // Criação/Atualização: Usuários autenticados (Professores)
+      allow create, update: if request.auth != null;
+      
+      // Deleção: Não permitido
       allow delete: if false;
     }
     
     // ============================================
-    // Silent Feedback
+    // COLEÇÃO: MEET ATTENDANCE (Logs de Presença)
     // ============================================
-    match /meetFeedback/{feedbackId} {
-      // Anyone can read feedback
+    match /meetAttendance/{logId} {
+      // Leitura: Todos podem ler
       allow read: if true;
       
-      // Anyone can create/update feedback
+      // Criação: Qualquer um pode criar (entrar em sessão)
+      allow create: if true;
+      
+      // Atualização: Qualquer um pode atualizar (para leftAt)
+      allow update: if true;
+      
+      // Deleção: Não permitido
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // COLEÇÃO: MEET FEEDBACK (Feedback Silencioso)
+    // ============================================
+    match /meetFeedback/{feedbackId} {
+      // Leitura: Todos podem ler
+      allow read: if true;
+      
+      // Criação/Atualização: Qualquer um pode dar feedback
       allow create, update: if true;
       
-      // No delete
+      // Deleção: Não permitido
       allow delete: if false;
     }
   }
