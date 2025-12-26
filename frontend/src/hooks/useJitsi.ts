@@ -292,9 +292,10 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
     }, [isTeacher]);
 
     // Server Configuration with Fallback
+    // IMPORTANTE: Deve usar o mesmo servidor que o desktop (jitsi.hamburg.ccc.de)
     const JITSI_SERVERS = [
-        'meet.ffmuc.net',           // Primary: Freifunk München (Alemanha - melhor infra)
-        'jitsi.hamburg.ccc.de',     // Fallback: CCC Hamburg (Alemanha)
+        'jitsi.hamburg.ccc.de',     // Primary: CCC Hamburg (mesmo servidor do desktop)
+        'meet.ffmuc.net',           // Fallback: Freifunk München (Alemanha)
     ];
 
     useEffect(() => {
