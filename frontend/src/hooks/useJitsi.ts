@@ -87,7 +87,12 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
 
         // Config overwrite - Permissões do Jitsi
         const baseConfig = {
+            // Desabilitar prejoin de todas as formas possíveis
             prejoinPageEnabled: false,
+            prejoinConfig: {
+                enabled: false,
+                hideExtraJoinButtons: ['no-audio', 'by-phone']
+            },
             startWithAudioMuted: true,
             startWithVideoMuted: false,
             startAudioOnly: false,           // FORÇAR: Não iniciar em modo audio-only
@@ -311,10 +316,10 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
     }, [isTeacher]);
 
     // Server Configuration with Fallback
-    // IMPORTANTE: Deve usar o mesmo servidor que o desktop (jitsi.hamburg.ccc.de)
+    // IMPORTANTE: Deve usar o mesmo servidor que o desktop
     const JITSI_SERVERS = [
-        'jitsi.hamburg.ccc.de',     // Primary: CCC Hamburg (mesmo servidor do desktop)
-        'meet.ffmuc.net',           // Fallback: Freifunk München (Alemanha)
+        '8x8.vc',                       // Primary: 8x8 Official Jitsi (mais estável)
+        'meet.jit.si',                  // Fallback: Jitsi Meet oficial
     ];
 
     useEffect(() => {
