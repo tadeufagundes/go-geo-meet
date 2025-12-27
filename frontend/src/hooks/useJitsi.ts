@@ -316,10 +316,10 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
     }, [isTeacher]);
 
     // Server Configuration with Fallback
-    // IMPORTANTE: Deve usar o mesmo servidor que o desktop (meet.jit.si)
+    // IMPORTANTE: Deve usar o mesmo servidor que o desktop (meet.adminforge.de)
     const JITSI_SERVERS = [
-        'meet.jit.si',                  // Primary: Jitsi Meet oficial
-        'jitsi.hamburg.ccc.de',         // Fallback: CCC Hamburg
+        'meet.adminforge.de',           // Primary: AdminForge (comunitário sem limite)
+        'meet.in-berlin.de',            // Fallback: Individual Network Berlin
     ];
 
     useEffect(() => {
