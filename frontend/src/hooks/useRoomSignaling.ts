@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { supabase, getRoomChannel } from '@/supabase';
 
 interface UseRoomSignalingOptions {
@@ -8,21 +8,37 @@ interface UseRoomSignalingOptions {
 }
 
 export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived }: UseRoomSignalingOptions) {
+    const channelRef = useRef<ReturnType<typeof getRoomChannel> | null>(null);
+    const onMoveToRoomRef = useRef(onMoveToRoom);
+    const onBroadcastReceivedRef = useRef(onBroadcastReceived);
+
     useEffect(() => {
-        if (!sessionId) return;
+        onMoveToRoomRef.current = onMoveToRoom;
+    }, [onMoveToRoom]);
+
+    useEffect(() => {
+        onBroadcastReceivedRef.current = onBroadcastReceived;
+    }, [onBroadcastReceived]);
+
+    useEffect(() => {
+        if (!sessionId) {
+            channelRef.current = null;
+            return;
+        }
 
         const channel = getRoomChannel(sessionId);
+        channelRef.current = channel;
 
         channel
             .on('broadcast', { event: 'move-to-room' }, ({ payload }) => {
                 console.log('[Realtime] Move to room signal received:', payload);
                 if (payload.roomName) {
-                    onMoveToRoom?.(payload.roomName);
+                    onMoveToRoomRef.current?.(payload.roomName);
                 }
             })
             .on('broadcast', { event: 'app-signal' }, ({ payload }) => {
                 console.log('[Realtime] App signal received:', payload);
-                onBroadcastReceived?.(payload);
+                onBroadcastReceivedRef.current?.(payload);
             })
             .subscribe(async (status, err) => {
                 if (status === 'SUBSCRIBED') {
@@ -37,16 +53,25 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
             });
 
         return () => {
+            if (channelRef.current === channel) {
+                channelRef.current = null;
+            }
             supabase.removeChannel(channel);
         };
-    }, [sessionId, onMoveToRoom, onBroadcastReceived]);
+    }, [sessionId]);
 
     const sendSignal = useCallback(async (event: string, payload: any) => {
-        const channel = getRoomChannel(sessionId);
+        const channel = channelRef.current;
+
+        if (!sessionId || !channel) {
+            console.warn('[Realtime] Cannot send signal without an active room channel.');
+            return;
+        }
+
         await channel.send({
             type: 'broadcast',
-            event: event,
-            payload: payload,
+            event,
+            payload,
         });
     }, [sessionId]);
 
