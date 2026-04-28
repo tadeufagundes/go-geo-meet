@@ -22,6 +22,11 @@ interface UseJitsiOptions {
  */
 export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: UseJitsiOptions) {
     const apiRef = useRef<JitsiMeetExternalAPI | null>(null);
+    const readyTimeoutRef = useRef<number | null>(null);
+    const onParticipantJoinedRef = useRef<UseJitsiOptions['onParticipantJoined']>(undefined);
+    const onParticipantLeftRef = useRef<UseJitsiOptions['onParticipantLeft']>(undefined);
+    const onMeetingEndRef = useRef<UseJitsiOptions['onMeetingEnd']>(undefined);
+    const onReadyRef = useRef<UseJitsiOptions['onReady']>(undefined);
     const [isReady, setIsReady] = useState(false);
     const [participants, setParticipants] = useState<Participant[]>([]);
     const [currentDomain, setCurrentDomain] = useState<string>('');
@@ -38,6 +43,22 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
     } = options;
 
     const isTeacher = role === 'teacher';
+
+    useEffect(() => {
+        onParticipantJoinedRef.current = onParticipantJoined;
+    }, [onParticipantJoined]);
+
+    useEffect(() => {
+        onParticipantLeftRef.current = onParticipantLeft;
+    }, [onParticipantLeft]);
+
+    useEffect(() => {
+        onMeetingEndRef.current = onMeetingEnd;
+    }, [onMeetingEnd]);
+
+    useEffect(() => {
+        onReadyRef.current = onReady;
+    }, [onReady]);
 
     const initJitsi = useCallback((domain: string) => {
         console.log(`[Jitsi] Initializing with server: ${domain}`);
@@ -203,11 +224,11 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
                 console.log('[Jitsi] Teacher joined as:', event.id);
             }
             
-            onReady?.(event.id);
+            onReadyRef.current?.(event.id);
         }) as unknown as () => void);
 
         // Failsafe: Se o evento não disparar em 5 segundos, libera a tela
-        setTimeout(() => {
+        readyTimeoutRef.current = window.setTimeout(() => {
             setIsReady((prev) => {
                 if (!prev) {
                     console.warn('[Jitsi] Failsafe: forcing ready state after 5s');
@@ -224,21 +245,21 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
                 displayName: event.displayName || 'Participante',
             };
             setParticipants((prev) => [...prev, participant]);
-            onParticipantJoined?.(participant);
+            onParticipantJoinedRef.current?.(participant);
             console.log('[Jitsi] Participant joined:', participant.displayName);
         }) as unknown as () => void);
 
         // Participant left
         api.addListener('participantLeft', ((event: { id: string }) => {
             setParticipants((prev) => prev.filter((p) => p.id !== event.id));
-            onParticipantLeft?.(event.id);
+            onParticipantLeftRef.current?.(event.id);
             console.log('[Jitsi] Participant left:', event.id);
         }) as unknown as () => void);
 
         // Meeting ended
         api.addListener('readyToClose', () => {
             console.log('[Jitsi] Meeting ended');
-            onMeetingEnd?.();
+            onMeetingEndRef.current?.();
         });
 
         // Screen sharing started/stopped (para debug)
@@ -260,9 +281,14 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         
         // Expose API globally for moderator controls
         (window as { jitsiApi?: typeof api }).jitsiApi = api;
-    }, [roomName, displayName, password, role, isTeacher, onParticipantJoined, onParticipantLeft, onMeetingEnd, onReady, containerRef]);
+            }, [roomName, displayName, password, role, isTeacher, containerRef]);
 
     const dispose = useCallback(() => {
+                if (readyTimeoutRef.current !== null) {
+                    window.clearTimeout(readyTimeoutRef.current);
+                    readyTimeoutRef.current = null;
+                }
+
         if (apiRef.current) {
             apiRef.current.dispose();
             apiRef.current = null;
