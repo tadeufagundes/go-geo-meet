@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Users, HelpCircle, Shuffle, X, Monitor, MicOff, UserX, LayoutGrid, Brain, Zap, Trophy, Music, Heart } from 'lucide-react';
 import { useTeacherFeedback } from '@/hooks/useFeedback';
 import { useRoomSignaling } from '@/hooks/useRoomSignaling';
+import { useTeacherBreakoutState } from '@/hooks/useTeacherBreakoutState';
 import type { Participant } from '@/types';
 import {
     resolveStudentPresenceSync,
@@ -16,6 +17,7 @@ interface TeacherPanelProps {
     onShareScreen?: () => void;
     onMuteAll?: () => void;
     onKickParticipant?: (participantId: string) => void;
+    isMeetingReady?: boolean;
     onAddBreakoutRoom?: (name: string) => void;
     onRemoveBreakoutRoom?: (name: string) => void;
     onSendToBreakoutRoom?: (participantId: string, roomName: string) => void;
@@ -29,6 +31,7 @@ export function TeacherPanel({
     onShareScreen,
     onMuteAll,
     onKickParticipant,
+    isMeetingReady = false,
     onAddBreakoutRoom,
     onRemoveBreakoutRoom,
     onSendToBreakoutRoom,
@@ -38,17 +41,22 @@ export function TeacherPanel({
     const [isSharing, setIsSharing] = useState(false);
     const [isAiListening, setIsAiListening] = useState(false);
     const [aiInsights, setAiInsights] = useState<{id: string, text: string, type: 'error' | 'tip'}[]>([]);
-    const [breakoutRooms, setBreakoutRooms] = useState<string[]>([]);
     const [participantRooms, setParticipantRooms] = useState<Record<string, string>>({});
     const [participantStudentIds, setParticipantStudentIds] = useState<Record<string, string>>({});
-    const [studentAssignments, setStudentAssignments] = useState<Record<string, string>>({});
+    const syncedBreakoutRoomsRef = useRef<string[]>([]);
+    const hasRequestedPresenceSyncRef = useRef(false);
+
+    const { breakoutRooms, setBreakoutRooms, studentAssignments, setStudentAssignments } = useTeacherBreakoutState({
+        sessionId: sessionId || roomName,
+        mainRoomName: roomName,
+    });
 
     const { confusedCount } = useTeacherFeedback({
         sessionId,
         enabled: true,
     });
 
-    const { moveToRoom, sendSignal } = useRoomSignaling({
+    const { isConnected, moveToRoom, sendSignal } = useRoomSignaling({
         sessionId,
         onBroadcastReceived: (payload) => {
             if (payload.type === 'AI_INSIGHT') {
@@ -110,6 +118,43 @@ export function TeacherPanel({
     });
 
     useEffect(() => {
+        if (!isMeetingReady) {
+            syncedBreakoutRoomsRef.current = [];
+            return;
+        }
+
+        const previousRooms = syncedBreakoutRoomsRef.current;
+        const previousRoomSet = new Set(previousRooms);
+        const nextRoomSet = new Set(breakoutRooms);
+
+        breakoutRooms
+            .filter((breakoutRoom) => !previousRoomSet.has(breakoutRoom))
+            .forEach((breakoutRoom) => onAddBreakoutRoom?.(breakoutRoom));
+
+        previousRooms
+            .filter((breakoutRoom) => !nextRoomSet.has(breakoutRoom))
+            .forEach((breakoutRoom) => onRemoveBreakoutRoom?.(breakoutRoom));
+
+        syncedBreakoutRoomsRef.current = breakoutRooms;
+    }, [breakoutRooms, isMeetingReady, onAddBreakoutRoom, onRemoveBreakoutRoom]);
+
+    useEffect(() => {
+        if (!isConnected || !isMeetingReady) {
+            hasRequestedPresenceSyncRef.current = false;
+            return;
+        }
+
+        if (hasRequestedPresenceSyncRef.current) {
+            return;
+        }
+
+        hasRequestedPresenceSyncRef.current = true;
+        sendSignal('app-signal', {
+            type: 'PRESENCE_SYNC_REQUEST',
+        });
+    }, [isConnected, isMeetingReady, sendSignal]);
+
+    useEffect(() => {
         const activeParticipantIds = new Set(participants.map((participant) => participant.id));
 
         setParticipantRooms((prev) => Object.fromEntries(
@@ -152,10 +197,6 @@ export function TeacherPanel({
         const rooms = Array.from({ length: roomCount }, (_, index) => `Sala ${index + 1}`);
         const removedAssignments = Object.entries(participantRooms).filter(([, assignedRoom]) => !rooms.includes(assignedRoom));
 
-        breakoutRooms
-            .filter((existingRoom) => !rooms.includes(existingRoom))
-            .forEach((staleRoom) => onRemoveBreakoutRoom?.(staleRoom));
-
         removedAssignments.forEach(([participantId]) => {
             sendSignal('app-signal', {
                 type: 'BREAKOUT_RESET',
@@ -165,7 +206,6 @@ export function TeacherPanel({
             });
         });
 
-        rooms.forEach((name) => onAddBreakoutRoom?.(name));
         setBreakoutRooms(rooms);
         setParticipantRooms((prev) => Object.fromEntries(
             Object.entries(prev).filter(([, assignedRoom]) => rooms.includes(assignedRoom))
@@ -178,7 +218,7 @@ export function TeacherPanel({
             rooms,
             mainRoomName: roomName,
         });
-    }, [breakoutRooms, onAddBreakoutRoom, onRemoveBreakoutRoom, participantRooms, participantStudentIds, roomName, sendSignal]);
+    }, [breakoutRooms, participantRooms, participantStudentIds, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
 
     const handleAssignParticipant = useCallback((participant: Participant, nextRoom: string) => {
         const participantStudentId = participantStudentIds[participant.id];
@@ -190,6 +230,7 @@ export function TeacherPanel({
         sendSignal('app-signal', {
             type: 'BREAKOUT_ASSIGNMENT',
             participantId: participant.id,
+            studentId: participantStudentId,
             roomName: nextRoom,
             mainRoomName: roomName,
         });
@@ -219,7 +260,7 @@ export function TeacherPanel({
                 };
             });
         }
-    }, [onSendToBreakoutRoom, participantStudentIds, roomName, sendSignal]);
+    }, [onSendToBreakoutRoom, participantStudentIds, roomName, sendSignal, setStudentAssignments]);
 
     const handleReturnEveryone = useCallback(() => {
         moveToRoom(roomName);
@@ -229,7 +270,7 @@ export function TeacherPanel({
             type: 'BREAKOUT_RESET',
             roomName,
         });
-    }, [moveToRoom, roomName, sendSignal]);
+    }, [moveToRoom, roomName, sendSignal, setStudentAssignments]);
 
     if (!isOpen) {
         return (

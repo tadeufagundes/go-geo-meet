@@ -365,6 +365,7 @@ export function TeacherRoom() {
                                 onShareScreen={handleShareScreen}
                                 onMuteAll={handleMuteAll}
                                 onKickParticipant={handleKickParticipant}
+                                isMeetingReady={isJitsiReady}
                                 onAddBreakoutRoom={(name) => {
                                     if (jitsiApiRef.current) {
                                         jitsiApiRef.current.executeCommand('addBreakoutRoom', name);

@@ -22,6 +22,7 @@ export function StudentRoom() {
     const [currentQuiz, setCurrentQuiz] = useState<QuizQuestion | null>(null);
     const [activeReaction, setActiveReaction] = useState<string | null>(null);
     const [localParticipantId, setLocalParticipantId] = useState<string | null>(null);
+    const [presenceSyncVersion, setPresenceSyncVersion] = useState(0);
     const hasJoined = useRef(false);
     const {
         studentId,
@@ -57,6 +58,8 @@ export function StudentRoom() {
             ) {
                 console.log('[Student] Returning to main room:', payload.roomName);
                 setCurrentRoomName(payload.roomName);
+            } else if (payload.type === 'PRESENCE_SYNC_REQUEST') {
+                setPresenceSyncVersion((previousValue) => previousValue + 1);
             } else if (payload.type === 'REACTION') {
                 console.log('[Student] Reaction received:', payload.emoji);
                 setActiveReaction(payload.emoji);
@@ -92,7 +95,7 @@ export function StudentRoom() {
             studentName,
             currentRoomName,
         });
-    }, [apiSessionId, currentRoomName, isConnected, localParticipantId, sendSignal, studentId, studentName]);
+    }, [apiSessionId, currentRoomName, isConnected, localParticipantId, presenceSyncVersion, sendSignal, studentId, studentName]);
 
     const handleMeetingEnd = useCallback(async () => {
         resetRoomName();
