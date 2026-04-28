@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { supabase, getRoomChannel } from '@/supabase';
+import { supabase, getRoomChannel, isSupabaseConfigured } from '@/supabase';
 
 interface UseRoomSignalingOptions {
     sessionId: string;
@@ -22,7 +22,7 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
     }, [onBroadcastReceived]);
 
     useEffect(() => {
-        if (!sessionId) {
+        if (!sessionId || !isSupabaseConfigured) {
             channelRef.current = null;
             setIsConnected(false);
             return;
@@ -72,7 +72,11 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
     const sendSignal = useCallback(async (event: string, payload: any) => {
         const channel = channelRef.current;
 
-        if (!sessionId || !channel) {
+        if (!sessionId || !isSupabaseConfigured) {
+            return;
+        }
+
+        if (!channel) {
             console.warn('[Realtime] Cannot send signal without an active room channel.');
             return;
         }

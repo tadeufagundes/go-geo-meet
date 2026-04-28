@@ -6,12 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useRoomSignaling } from './useRoomSignaling';
 
-const { removeChannelMock, getRoomChannelMock } = vi.hoisted(() => ({
+const { removeChannelMock, getRoomChannelMock, supabaseConfigState } = vi.hoisted(() => ({
     removeChannelMock: vi.fn(),
     getRoomChannelMock: vi.fn(),
+    supabaseConfigState: { current: true },
 }));
 
 vi.mock('@/supabase', () => ({
+    get isSupabaseConfigured() {
+        return supabaseConfigState.current;
+    },
     supabase: {
         removeChannel: removeChannelMock,
     },
@@ -54,6 +58,7 @@ function Harness({ sessionId, onMoveToRoom, onBroadcastReceived, onReady }: Harn
 
 describe('useRoomSignaling', () => {
     beforeEach(() => {
+        supabaseConfigState.current = true;
         removeChannelMock.mockReset();
         getRoomChannelMock.mockReset();
     });
@@ -130,5 +135,32 @@ describe('useRoomSignaling', () => {
         unmount();
 
         expect(removeChannelMock).toHaveBeenCalledWith(channel);
+    });
+
+    it('stays idle when Supabase realtime is not configured', async () => {
+        supabaseConfigState.current = false;
+
+        let api!: ReturnType<typeof useRoomSignaling>;
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+        render(
+            <Harness
+                sessionId="session-1"
+                onReady={(value) => {
+                    api = value;
+                }}
+            />
+        );
+
+        await act(async () => {
+            await api.sendSignal('app-signal', { type: 'PING' });
+        });
+
+        expect(api.isConnected).toBe(false);
+        expect(getRoomChannelMock).not.toHaveBeenCalled();
+        expect(removeChannelMock).not.toHaveBeenCalled();
+        expect(warnSpy).not.toHaveBeenCalledWith('[Realtime] Cannot send signal without an active room channel.');
+
+        warnSpy.mockRestore();
     });
 });
