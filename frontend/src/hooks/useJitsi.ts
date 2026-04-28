@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { EMBEDDABLE_JITSI_SERVERS } from '@/config/jitsiServers';
 import type { Participant } from '@/types';
 
 interface UseJitsiOptions {
@@ -325,10 +326,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
 
     // Server Configuration with Fallback
     // TODO: Resolver questão de servidor (comunitário ou próprio) depois
-    const JITSI_SERVERS = [
-        'meet.jit.si',                  // Primary: Jitsi Meet oficial (5min demo limit)
-        'meet.ffmuc.net',               // Fallback: Freifunk München
-    ];
+    const JITSI_SERVERS = [...EMBEDDABLE_JITSI_SERVERS];
 
     useEffect(() => {
         const serverIndex = 0;

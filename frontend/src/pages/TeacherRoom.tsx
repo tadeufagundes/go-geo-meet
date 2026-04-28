@@ -4,13 +4,8 @@ import { Brain } from 'lucide-react';
 import * as sessionService from '../services/sessionService';
 import { TeacherPanel } from '../components/teacher/TeacherPanel';
 import { EndSessionSummary } from '../components/teacher/EndSessionSummary';
+import { EMBEDDABLE_JITSI_SERVERS } from '../config/jitsiServers';
 import type { Participant } from '../types';
-
-// Jitsi server configuration
-const JITSI_SERVERS = [
-    'meet.ffmuc.net',
-    'jitsi.hamburg.ccc.de',
-];
 
 // Declare types
 declare global {
@@ -123,16 +118,42 @@ export function TeacherRoom() {
             container.id = 'jitsi-container';
             pip.document.body.appendChild(container);
 
-            // Load Jitsi External API script
-            const domain = JITSI_SERVERS[0];
-            const script = pip.document.createElement('script');
-            script.src = `https://${domain}/external_api.js`;
-            script.onload = () => {
-                console.log('[PiP] Jitsi API loaded, initializing...');
-                
-                // Initialize Jitsi Meet
+            let joinFallbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+            const clearJoinFallbackTimeout = () => {
+                if (joinFallbackTimeoutId !== null) {
+                    clearTimeout(joinFallbackTimeoutId);
+                    joinFallbackTimeoutId = null;
+                }
+            };
+
+            const resetEmbeddedConference = () => {
+                clearJoinFallbackTimeout();
+                if (jitsiApiRef.current) {
+                    jitsiApiRef.current.dispose();
+                    jitsiApiRef.current = null;
+                }
+                container.innerHTML = '';
+                setIsJitsiReady(false);
+                setParticipants([]);
+                setIsScreenSharing(false);
+            };
+
+            const initializeConference = (serverIndex: number) => {
+                if (serverIndex >= EMBEDDABLE_JITSI_SERVERS.length) {
+                    resetEmbeddedConference();
+                    alert('Nao foi possivel carregar um servidor Jitsi compativel para esta aula.');
+                    return;
+                }
+
+                const domain = EMBEDDABLE_JITSI_SERVERS[serverIndex];
+                let hasJoinedConference = false;
+
+                resetEmbeddedConference();
+                console.log(`[PiP] Initializing Jitsi with server: ${domain}`);
+
                 const api = new pip.window.JitsiMeetExternalAPI(domain, {
-                    roomName: roomName,
+                    roomName,
                     parentNode: container,
                     width: '100%',
                     height: '100%',
@@ -148,9 +169,7 @@ export function TeacherRoom() {
                         disableInviteFunctions: true,
                         enableWelcomePage: false,
                         disableRemoteMute: false,
-                        // Force tile view as default (fills the whole window)
                         startInTileView: true,
-                        // Disable filmstrip to maximize video space
                         disableFilmstripAutohiding: true,
                         remoteVideoMenu: {
                             disableKick: false,
@@ -169,24 +188,31 @@ export function TeacherRoom() {
                             'hangup', 'chat', 'raisehand', 'tileview',
                             'mute-everyone', 'participants-pane',
                         ],
-                        // Remove filmstrip constraints - let tile view use full space
                         DISABLE_VIDEO_BACKGROUND: true,
                         DEFAULT_BACKGROUND: '#1a1a2e',
                         TOOLBAR_ALWAYS_VISIBLE: false,
-                        // Force tile view layout
                         TILE_VIEW_MAX_COLUMNS: 2,
                     },
                 });
 
                 jitsiApiRef.current = api;
 
-                // Listen for conference joined
+                joinFallbackTimeoutId = setTimeout(() => {
+                    if (hasJoinedConference || jitsiApiRef.current !== api) {
+                        return;
+                    }
+
+                    console.warn(`[PiP] Conference did not join on ${domain}, trying next server...`);
+                    initializeConference(serverIndex + 1);
+                }, 8000);
+
                 api.addListener('videoConferenceJoined', () => {
+                    hasJoinedConference = true;
+                    clearJoinFallbackTimeout();
                     console.log('[PiP] Conference joined');
                     setIsJitsiReady(true);
                 });
 
-                // Listen for participants
                 api.addListener('participantJoined', (data: unknown) => {
                     const p = data as { id: string; displayName: string };
                     console.log('[PiP] Participant joined:', p.displayName);
@@ -199,33 +225,61 @@ export function TeacherRoom() {
                     setParticipants(prev => prev.filter(x => x.id !== p.id));
                 });
 
-                // Listen for screen sharing status
                 api.addListener('screenSharingStatusChanged', (data: unknown) => {
                     const { on } = data as { on: boolean };
                     console.log('[PiP] Screen sharing:', on);
                     setIsScreenSharing(on);
-                    
-                    // Toggle compact mode
+
                     if (on) {
                         pip.document.body.classList.add('compact-mode');
-                        pip.resizeTo(200, 400); // Narrow filmstrip
+                        pip.resizeTo(200, 400);
                     } else {
                         pip.document.body.classList.remove('compact-mode');
-                        pip.resizeTo(400, 500); // Normal size
+                        pip.resizeTo(400, 500);
                     }
                 });
 
-                // Listen for hangup
                 api.addListener('videoConferenceLeft', () => {
+                    clearJoinFallbackTimeout();
                     console.log('[PiP] Conference left');
                     pip.close();
                 });
             };
-            pip.document.head.appendChild(script);
+
+            const loadConferenceScript = (serverIndex: number) => {
+                if (serverIndex >= EMBEDDABLE_JITSI_SERVERS.length) {
+                    resetEmbeddedConference();
+                    alert('Nao foi possivel carregar um servidor Jitsi compativel para esta aula.');
+                    return;
+                }
+
+                const domain = EMBEDDABLE_JITSI_SERVERS[serverIndex];
+
+                if (pip.window.JitsiMeetExternalAPI) {
+                    initializeConference(serverIndex);
+                    return;
+                }
+
+                const script = pip.document.createElement('script');
+                script.src = `https://${domain}/external_api.js`;
+                script.onload = () => {
+                    console.log('[PiP] Jitsi API loaded, initializing...');
+                    initializeConference(serverIndex);
+                };
+                script.onerror = () => {
+                    console.warn(`[PiP] Failed to load Jitsi API from ${domain}, trying next server...`);
+                    script.remove();
+                    loadConferenceScript(serverIndex + 1);
+                };
+                pip.document.head.appendChild(script);
+            };
+
+            loadConferenceScript(0);
 
             // Handle PiP window close
             pip.addEventListener('pagehide', () => {
                 console.log('[PiP] Window closed');
+                clearJoinFallbackTimeout();
                 if (jitsiApiRef.current) {
                     jitsiApiRef.current.dispose();
                     jitsiApiRef.current = null;
