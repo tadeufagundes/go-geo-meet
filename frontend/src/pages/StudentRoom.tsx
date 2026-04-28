@@ -6,16 +6,20 @@ import { BroadcastView } from '../components/student/BroadcastView';
 import { QuizModal, type QuizQuestion } from '../components/student/QuizModal';
 import { Video, LogOut, Users } from 'lucide-react';
 import * as attendanceService from '../services/attendanceService';
+import type { SessionDTO } from '../services/sessionService';
+import * as sessionService from '../services/sessionService';
 import { useRoomSignaling } from '../hooks/useRoomSignaling';
 import { useStudentSessionState } from '../hooks/useStudentSessionState';
 
-export function StudentRoom() {
-    const { sessionId: roomName } = useParams<{ sessionId: string }>();
-    const [searchParams] = useSearchParams();
-    const navigate = useNavigate();
+interface ResolvedStudentRoomProps {
+    session: SessionDTO;
+    studentName: string;
+}
 
-    const studentName = searchParams.get('name') || 'Aluno';
-    const apiSessionId = searchParams.get('sessionId') || roomName || '';
+function ResolvedStudentRoom({ session, studentName }: ResolvedStudentRoomProps) {
+    const navigate = useNavigate();
+    const apiSessionId = session.id;
+    const roomName = session.jitsiRoomName;
 
     const [isReady, setIsReady] = useState(false);
     const [attendanceId, setAttendanceId] = useState<string | null>(null);
@@ -32,7 +36,7 @@ export function StudentRoom() {
     } = useStudentSessionState({
         sessionId: apiSessionId,
         studentName,
-        mainRoomName: roomName || '',
+        mainRoomName: roomName,
     });
 
     const { isConnected, sendSignal } = useRoomSignaling({
@@ -239,4 +243,100 @@ export function StudentRoom() {
             )}
         </div>
     );
+}
+
+export function StudentRoom() {
+    const { sessionId: sessionEntry } = useParams<{ sessionId: string }>();
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+
+    const studentName = searchParams.get('name') || 'Aluno';
+    const sessionIdHint = searchParams.get('sessionId') || '';
+    const [resolvedSession, setResolvedSession] = useState<SessionDTO | null>(null);
+    const [isResolvingSession, setIsResolvingSession] = useState(true);
+    const [resolutionError, setResolutionError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        const resolveStudentSession = async () => {
+            if (!sessionEntry) {
+                setResolvedSession(null);
+                setResolutionError('Sessão não encontrada');
+                setIsResolvingSession(false);
+                return;
+            }
+
+            setIsResolvingSession(true);
+            setResolutionError(null);
+
+            try {
+                const session = await sessionService.resolveSessionAccess(sessionEntry, sessionIdHint || undefined);
+
+                if (isCancelled) {
+                    return;
+                }
+
+                if (!session) {
+                    setResolvedSession(null);
+                    setResolutionError('A aula informada não foi encontrada. Confirme o código ou use o link compartilhado pelo professor.');
+                    setIsResolvingSession(false);
+                    return;
+                }
+
+                setResolvedSession(session);
+                setIsResolvingSession(false);
+
+                if (sessionEntry !== session.jitsiRoomName || sessionIdHint !== session.id) {
+                    navigate(
+                        `/student/room/${encodeURIComponent(session.jitsiRoomName)}?name=${encodeURIComponent(studentName)}&sessionId=${session.id}`,
+                        { replace: true }
+                    );
+                }
+            } catch (error) {
+                console.error('Error resolving student session:', error);
+
+                if (isCancelled) {
+                    return;
+                }
+
+                setResolvedSession(null);
+                setResolutionError('Não foi possível validar a aula informada. Tente novamente.');
+                setIsResolvingSession(false);
+            }
+        };
+
+        void resolveStudentSession();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [navigate, sessionEntry, sessionIdHint, studentName]);
+
+    if (isResolvingSession) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+                <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4" />
+                <p className="text-gray-600 mb-2">A validar a aula...</p>
+                <p className="text-sm text-gray-500">Estamos a confirmar a sala correta antes de entrar no Jitsi.</p>
+            </div>
+        );
+    }
+
+    if (!resolvedSession || resolutionError) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-6 text-center">
+                <Video className="w-16 h-16 text-gray-400 mb-4" />
+                <p className="text-gray-700 mb-2">{resolutionError || 'Sessão não encontrada'}</p>
+                <button
+                    onClick={() => navigate('/login')}
+                    className="text-cyan-500 hover:text-cyan-600"
+                >
+                    Voltar ao início
+                </button>
+            </div>
+        );
+    }
+
+    return <ResolvedStudentRoom session={resolvedSession} studentName={studentName} />;
 }

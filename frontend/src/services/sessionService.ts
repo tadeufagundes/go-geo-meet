@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { v4 as uuidv4 } from 'uuid';
+import { resolveSessionAccessWithLookup } from './sessionAccess';
 
 // Collections
 const SESSIONS_COLLECTION = 'meetSessions';
@@ -164,6 +165,47 @@ export async function getSession(sessionId: string): Promise<SessionDTO | null> 
         startedAt: data.startedAt?.toDate().toISOString(),
         endedAt: data.endedAt?.toDate().toISOString(),
     };
+}
+
+async function getSessionByRoomName(roomName: string): Promise<SessionDTO | null> {
+    const roomNameQuery = query(
+        collection(db, SESSIONS_COLLECTION),
+        where('jitsiRoomName', '==', roomName),
+        limit(1)
+    );
+
+    const snapshot = await getDocs(roomNameQuery);
+
+    if (snapshot.empty) {
+        return null;
+    }
+
+    const sessionDoc = snapshot.docs[0];
+    const data = sessionDoc.data();
+
+    return {
+        id: sessionDoc.id,
+        turmaId: data.turmaId,
+        turmaName: data.turmaName,
+        teacherId: data.teacherId,
+        teacherName: data.teacherName,
+        jitsiRoomName: data.jitsiRoomName,
+        status: data.status,
+        scheduledAt: data.scheduledAt?.toDate().toISOString() || '',
+        startedAt: data.startedAt?.toDate().toISOString(),
+        endedAt: data.endedAt?.toDate().toISOString(),
+    };
+}
+
+export async function resolveSessionAccess(sessionEntry: string, sessionIdHint?: string): Promise<SessionDTO | null> {
+    return resolveSessionAccessWithLookup(
+        {
+            getSessionById: getSession,
+            getSessionByRoomName,
+        },
+        sessionEntry,
+        sessionIdHint,
+    );
 }
 
 /**

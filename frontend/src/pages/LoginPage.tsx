@@ -29,10 +29,13 @@ export function LoginPage() {
                 await signIn(email, password);
                 navigate('/teacher');
             } else {
-                if (!name || !sessionCode) return;
+                const trimmedName = name.trim();
+                const trimmedSessionCode = sessionCode.trim();
+
+                if (!trimmedName || !trimmedSessionCode) return;
                 // Student Login: Anonymous with Name
-                await signInAnonymously(name);
-                navigate(`/student/room/${sessionCode}?name=${encodeURIComponent(name)}`);
+                await signInAnonymously(trimmedName);
+                navigate(`/student/room/${encodeURIComponent(trimmedSessionCode)}?name=${encodeURIComponent(trimmedName)}`);
             }
         } catch (err) {
             console.error('Login error:', err);
