@@ -7,6 +7,7 @@ import { QuizModal, type QuizQuestion } from '../components/student/QuizModal';
 import { Video, LogOut, Users } from 'lucide-react';
 import * as attendanceService from '../services/attendanceService';
 import { useRoomSignaling } from '../hooks/useRoomSignaling';
+import { useStudentSessionState } from '../hooks/useStudentSessionState';
 
 export function StudentRoom() {
     const { sessionId: roomName } = useParams<{ sessionId: string }>();
@@ -18,12 +19,20 @@ export function StudentRoom() {
 
     const [isReady, setIsReady] = useState(false);
     const [attendanceId, setAttendanceId] = useState<string | null>(null);
-    const [currentRoomName, setCurrentRoomName] = useState(roomName || '');
     const [currentQuiz, setCurrentQuiz] = useState<QuizQuestion | null>(null);
     const [activeReaction, setActiveReaction] = useState<string | null>(null);
     const [localParticipantId, setLocalParticipantId] = useState<string | null>(null);
-    const [studentId] = useState(() => `student-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
     const hasJoined = useRef(false);
+    const {
+        studentId,
+        currentRoomName,
+        setCurrentRoomName,
+        resetRoomName,
+    } = useStudentSessionState({
+        sessionId: apiSessionId,
+        studentName,
+        mainRoomName: roomName || '',
+    });
 
     // Listen for room signals and quizzes
     useRoomSignaling({
@@ -66,6 +75,8 @@ export function StudentRoom() {
     }, [apiSessionId, studentName]);
 
     const handleMeetingEnd = useCallback(async () => {
+        resetRoomName();
+
         // Record leave
         if (apiSessionId && attendanceId) {
             try {
@@ -75,7 +86,7 @@ export function StudentRoom() {
             }
         }
         navigate('/login');
-    }, [apiSessionId, attendanceId, navigate]);
+    }, [apiSessionId, attendanceId, navigate, resetRoomName]);
 
     const handleLeave = useCallback(() => {
         if (window.confirm('Tem certeza que deseja sair da aula?')) {
