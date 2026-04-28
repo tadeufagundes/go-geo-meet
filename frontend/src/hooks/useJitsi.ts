@@ -331,7 +331,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
     ];
 
     useEffect(() => {
-        let serverIndex = 0;
+        const serverIndex = 0;
 
         // Function to load Jitsi script with fallback
         const loadJitsiScript = (index: number) => {
