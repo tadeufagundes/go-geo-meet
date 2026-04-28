@@ -70,7 +70,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
 
         const studentToolbarButtons = [
             'microphone',
-            // 'camera' REMOVIDO - Aluno não pode desligar camera (solicitação do usuário)
+            // 'camera' REMOVIDO - Aluno não pode desligar camera
             // 'desktop' REMOVIDO - Aluno NÃO pode compartilhar tela
             'fullscreen',
             'fodeviceselection',
@@ -79,8 +79,6 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
             'raisehand',
             'videoquality',
             'filmstrip',
-            'tileview',
-            'settings',
         ];
 
 
@@ -247,6 +245,16 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
             console.log('[Jitsi] Screen sharing:', event.on ? 'started' : 'stopped', 'by', event.participantId);
         }) as unknown as () => void);
 
+        // Bloqueio de câmera para alunos: Não deixar mutar vídeo
+        if (!isTeacher) {
+            api.addListener('videoMutedStatusChanged', ((event: { muted: boolean }) => {
+                if (event.muted) {
+                    console.warn('[Jitsi] Student tried to mute video, forcing it back ON');
+                    api.executeCommand('setVideoMuted', false);
+                }
+            }) as unknown as () => void);
+        }
+
         apiRef.current = api as unknown as JitsiMeetExternalAPI;
         
         // Expose API globally for moderator controls
@@ -381,6 +389,12 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         muteEveryone,
         muteParticipant,
         kickParticipant,
+        // Breakout Rooms
+        addBreakoutRoom: (name: string) => apiRef.current?.executeCommand('addBreakoutRoom', name),
+        removeBreakoutRoom: (name: string) => apiRef.current?.executeCommand('removeBreakoutRoom', name),
+        joinBreakoutRoom: (name: string) => apiRef.current?.executeCommand('joinBreakoutRoom', name),
+        sendParticipantToRoom: (participantId: string, roomName: string) => 
+            apiRef.current?.executeCommand('sendParticipantToRoom', { participantId, roomName }),
     };
 }
 

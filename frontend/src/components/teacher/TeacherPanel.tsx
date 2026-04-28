@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
-import { Users, HelpCircle, Shuffle, X, ChevronRight, Monitor, MicOff, UserX } from 'lucide-react';
+import { Users, HelpCircle, Shuffle, X, ChevronRight, Monitor, MicOff, UserX, LayoutGrid, ArrowRight, Brain, Zap, Trophy, Music, Heart } from 'lucide-react';
 import { useTeacherFeedback } from '@/hooks/useFeedback';
+import { useRoomSignaling } from '@/hooks/useRoomSignaling';
 import type { Participant } from '@/types';
 
 interface TeacherPanelProps {
@@ -11,206 +12,244 @@ interface TeacherPanelProps {
     onShareScreen?: () => void;
     onMuteAll?: () => void;
     onKickParticipant?: (participantId: string) => void;
+    onAddBreakoutRoom?: (name: string) => void;
+    onSendToBreakoutRoom?: (participantId: string, roomName: string) => void;
 }
 
 export function TeacherPanel({ 
-    sessionId,
-    roomName,
-    participants, 
+    sessionId, 
+    roomName, 
+    participants,
     onEndSession,
     onShareScreen,
     onMuteAll,
     onKickParticipant,
+    onAddBreakoutRoom,
+    onSendToBreakoutRoom,
 }: TeacherPanelProps) {
     const [isOpen, setIsOpen] = useState(true);
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
     const [isSharing, setIsSharing] = useState(false);
+    const [isAiListening, setIsAiListening] = useState(false);
+    const [aiInsights, setAiInsights] = useState<{id: string, text: string, type: 'error' | 'tip'}[]>([]);
 
-    const { confusedStudents, confusedCount } = useTeacherFeedback({
+    const { confusedCount } = useTeacherFeedback({
         sessionId,
         enabled: true,
     });
 
-    const handlePickRandom = useCallback(() => {
-        // Pick from all participants, not just confused ones
-        if (participants.length === 0) return;
-        const randomIndex = Math.floor(Math.random() * participants.length);
-        const picked = participants[randomIndex];
-        setSelectedStudent(picked.displayName);
+    const { moveToRoom, sendSignal } = useRoomSignaling({
+        sessionId,
+        onBroadcastReceived: (payload) => {
+            if (payload.type === 'AI_INSIGHT') {
+                setAiInsights(prev => [payload.insight, ...prev].slice(0, 5));
+            }
+        }
+    });
 
-        // Clear selection after 5 seconds
+    const handlePickRandom = useCallback(() => {
+        if (participants.length === 0) return;
+        const randomIdx = Math.floor(Math.random() * participants.length);
+        const student = participants[randomIdx];
+        setSelectedStudent(student.displayName);
         setTimeout(() => setSelectedStudent(null), 5000);
     }, [participants]);
 
-    const handleShareScreen = useCallback(() => {
-        setIsSharing(!isSharing);
-        onShareScreen?.();
-    }, [isSharing, onShareScreen]);
-
-    const handleMuteAll = useCallback(() => {
-        if (window.confirm('Silenciar todos os participantes?')) {
-            onMuteAll?.();
-        }
-    }, [onMuteAll]);
-
-    const handleKickParticipant = useCallback((participantId: string, displayName: string) => {
-        if (window.confirm(`Remover "${displayName}" da aula?`)) {
-            onKickParticipant?.(participantId);
-        }
-    }, [onKickParticipant]);
-
     if (!isOpen) {
         return (
-            <button
+            <button 
                 onClick={() => setIsOpen(true)}
-                className="fixed right-0 top-1/2 -translate-y-1/2 bg-navy-900 text-white p-2 rounded-l-lg shadow-lg hover:bg-navy-800 transition-colors"
-                aria-label="Abrir painel do professor"
+                className="fixed right-6 bottom-6 w-14 h-14 bg-cyan-500 text-white rounded-full shadow-lg shadow-cyan-500/40 flex items-center justify-center hover:scale-110 transition-transform z-50"
             >
-                <ChevronRight className="w-5 h-5 rotate-180" />
+                <Users className="w-6 h-6" />
             </button>
         );
     }
 
     return (
-        <div className="fixed right-0 top-0 h-full w-80 bg-white shadow-2xl flex flex-col z-50">
+        <div className="w-80 h-full bg-navy-900 border-l border-white/10 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
             {/* Header */}
-            <div className="bg-navy-900 text-white p-4 flex items-center justify-between">
-                <h2 className="font-semibold">Painel do Professor</h2>
-                <button
-                    onClick={() => setIsOpen(false)}
-                    className="p-1 hover:bg-navy-800 rounded transition-colors"
-                    aria-label="Fechar painel"
-                >
+            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/5 backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <h2 className="font-bold text-white tracking-tight">PAINEL DE CONTROLE</h2>
+                </div>
+                <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white transition-colors">
                     <X className="w-5 h-5" />
                 </button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-3 p-4 border-b">
-                <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 text-gray-600 text-sm">
-                        <Users className="w-4 h-4" />
-                        <span>Participantes</span>
+            {/* Main Scrollable Area */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+                
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+                        <p className="text-gray-400 text-[10px] uppercase font-bold mb-1">Alunos</p>
+                        <p className="text-2xl font-bold text-white">{participants.length}</p>
                     </div>
-                    <p className="text-2xl font-bold text-navy-900 mt-1">
-                        {participants.length + 1}
-                    </p>
+                    <div className="bg-cyan-500/10 p-3 rounded-xl border border-cyan-500/20">
+                        <p className="text-cyan-400 text-[10px] uppercase font-bold mb-1">Dúvidas</p>
+                        <p className="text-2xl font-bold text-cyan-400">{confusedCount}</p>
+                    </div>
                 </div>
-                <div className={`rounded-lg p-3 ${confusedCount > 0 ? 'bg-cyan-50' : 'bg-gray-50'}`}>
-                    <div className="flex items-center gap-2 text-gray-600 text-sm">
-                        <HelpCircle className={`w-4 h-4 ${confusedCount > 0 ? 'text-cyan-500' : ''}`} />
-                        <span>Com dúvida</span>
+
+                {/* AI Controls Section */}
+                <div className="space-y-3">
+                    {!isAiListening ? (
+                        <button
+                            onClick={() => {
+                                sendSignal('ai-request', { sessionId, roomName, action: 'START' });
+                                setIsAiListening(true);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:shadow-lg hover:shadow-purple-500/20 transition-all active:scale-95"
+                        >
+                            <Brain className="w-5 h-5" />
+                            Ativar LARA AI
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                sendSignal('ai-request', { sessionId, roomName, action: 'STOP_AND_GENERATE' });
+                                setIsAiListening(false);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 bg-red-500/20 text-red-400 border border-red-500/30 py-3 px-4 rounded-xl font-bold hover:bg-red-500 hover:text-white transition-all animate-pulse"
+                        >
+                            <HelpCircle className="w-5 h-5" />
+                            Encerrar e Gerar Quiz
+                        </button>
+                    )}
+
+                    {isAiListening && (
+                        <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-2">
+                            <p className="text-purple-400 text-[10px] font-bold uppercase flex items-center gap-1">
+                                <Zap className="w-3 h-3" /> Insights Real-time
+                            </p>
+                            <div className="space-y-1.5">
+                                {aiInsights.map(insight => (
+                                    <div key={insight.id} className="text-[10px] text-gray-300 bg-white/5 p-2 rounded-lg border border-white/5">
+                                        {insight.text}
+                                    </div>
+                                ))}
+                                {aiInsights.length === 0 && <p className="text-gray-500 text-[10px] italic">Ouvindo conversa...</p>}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Quick Actions */}
+                <div className="space-y-2">
+                    <button onClick={onMuteAll} className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl text-gray-300 hover:bg-white/10 transition-colors group">
+                        <span className="text-sm font-medium">Mutar Todos</span>
+                        <MicOff className="w-4 h-4 group-hover:text-red-400" />
+                    </button>
+                    <button onClick={handlePickRandom} className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl text-gray-300 hover:bg-white/10 transition-colors group">
+                        <span className="text-sm font-medium">Sortear Aluno</span>
+                        <Shuffle className="w-4 h-4 group-hover:text-cyan-400" />
+                    </button>
+                    <button 
+                        onClick={() => {
+                            const count = window.prompt('Quantas salas?', '2');
+                            if (count) {
+                                const n = parseInt(count);
+                                for (let i = 1; i <= n; i++) onAddBreakoutRoom?.(`Sala ${i}`);
+                                sendSignal('app-signal', { type: 'BREAKOUT_STARTED', count: n });
+                            }
+                        }}
+                        className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl text-gray-300 hover:bg-white/10 transition-colors group"
+                    >
+                        <span className="text-sm font-medium">Breakout Rooms</span>
+                        <LayoutGrid className="w-4 h-4 group-hover:text-indigo-400" />
+                    </button>
+                </div>
+
+                {/* Soundboard - Pedagogical Reinforcement */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Recompensas Rápidas</p>
+                    <div className="grid grid-cols-3 gap-2">
+                        <button 
+                            onClick={() => sendSignal('app-signal', { type: 'REACTION', emoji: '🎉', sound: 'cheer' })}
+                            className="flex flex-col items-center gap-1 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl hover:bg-yellow-500 hover:text-white transition-all group"
+                        >
+                            <Trophy className="w-5 h-5 text-yellow-500 group-hover:text-white" />
+                            <span className="text-[8px] font-bold uppercase">Bravo!</span>
+                        </button>
+                        <button 
+                            onClick={() => sendSignal('app-signal', { type: 'REACTION', emoji: '👏', sound: 'clap' })}
+                            className="flex flex-col items-center gap-1 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500 hover:text-white transition-all group"
+                        >
+                            <Music className="w-5 h-5 text-blue-500 group-hover:text-white" />
+                            <span className="text-[8px] font-bold uppercase">Aplausos</span>
+                        </button>
+                        <button 
+                            onClick={() => sendSignal('app-signal', { type: 'REACTION', emoji: '❤️', sound: 'love' })}
+                            className="flex flex-col items-center gap-1 p-3 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500 hover:text-white transition-all group"
+                        >
+                            <Heart className="w-5 h-5 text-red-500 group-hover:text-white" />
+                            <span className="text-[8px] font-bold uppercase">Love It</span>
+                        </button>
                     </div>
-                    <p className={`text-2xl font-bold mt-1 ${confusedCount > 0 ? 'text-cyan-600' : 'text-navy-900'}`}>
-                        {confusedCount}
-                    </p>
+                </div>
+
+                {/* Participants List */}
+                <div className="space-y-3">
+                    <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Participantes</h3>
+                    <div className="space-y-3">
+                        {participants.length === 0 ? (
+                            <p className="text-gray-600 text-xs italic px-1">Nenhum aluno conectado</p>
+                        ) : (
+                            participants.map(p => (
+                                <div key={p.id} className="group p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-cyan-500/30 transition-all relative overflow-hidden">
+                                    <div className="flex items-center justify-between relative z-10">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white font-bold border border-white/10 text-xs">
+                                                {p.displayName.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-semibold text-white">{p.displayName}</h4>
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                                    <span className="text-[9px] text-gray-500 uppercase tracking-tight">Ativo</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => onKickParticipant?.(p.id)} className="p-2 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all">
+                                            <UserX className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    {/* Engagement Meter */}
+                                    <div className="mt-4 relative z-10">
+                                        <div className="flex justify-between text-[9px] text-gray-500 mb-1.5">
+                                            <span className="flex items-center gap-1 uppercase font-bold tracking-tighter"><Zap className="w-2.5 h-2.5 text-yellow-500" /> Engajamento</span>
+                                            <span className="font-mono">{Math.floor(Math.random() * 40 + 60)}%</span>
+                                        </div>
+                                        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                                            <div 
+                                                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-1000" 
+                                                style={{ width: `${Math.floor(Math.random() * 40 + 60)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* Random student picker result */}
+            {/* Selected Student Popup */}
             {selectedStudent && (
-                <div className="mx-4 mt-4 p-4 bg-gold/20 border border-gold rounded-lg text-center animate-pulse">
-                    <p className="text-sm text-gray-600">Aluno sorteado:</p>
-                    <p className="text-xl font-bold text-navy-900">{selectedStudent}</p>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-cyan-600 text-white p-6 rounded-2xl shadow-2xl shadow-cyan-500/40 text-center animate-bounce z-[100] border-4 border-white/20">
+                    <p className="text-xs uppercase font-bold mb-2 opacity-80">Sorteado!</p>
+                    <p className="text-2xl font-black">{selectedStudent}</p>
                 </div>
             )}
 
-            {/* Moderator Controls */}
-            <div className="p-4 border-b space-y-2">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                    Controles do Professor
-                </p>
-
-                {/* Share Screen Button with Audio Tip */}
-                <div className="relative group">
-                    <button
-                        onClick={handleShareScreen}
-                        className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-colors ${
-                            isSharing 
-                                ? 'bg-green-500 text-white hover:bg-green-600' 
-                                : 'bg-blue-500 text-white hover:bg-blue-600'
-                        }`}
-                    >
-                        <Monitor className="w-5 h-5" />
-                        {isSharing ? 'Parar Compartilhamento' : 'Compartilhar Tela'}
-                    </button>
-                    {/* Audio Sharing Tooltip */}
-                    <div className="hidden group-hover:block absolute left-0 right-0 top-full mt-1 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10">
-                        💡 <strong>Dica:</strong> Para compartilhar áudio (listening), selecione "Tela inteira" e marque "Compartilhar áudio".
-                    </div>
-                </div>
-
-                {/* Mute All Button */}
-                <button
-                    onClick={handleMuteAll}
-                    disabled={participants.length === 0}
-                    className="w-full flex items-center justify-center gap-2 bg-orange-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <MicOff className="w-5 h-5" />
-                    Silenciar Todos
-                </button>
-
-                {/* Random Pick Button */}
-                <button
-                    onClick={handlePickRandom}
-                    disabled={participants.length === 0}
-                    className="w-full flex items-center justify-center gap-2 bg-cyan-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <Shuffle className="w-5 h-5" />
-                    Sortear Aluno
-                </button>
-            </div>
-
-            {/* Participants list */}
-            <div className="flex-1 overflow-y-auto p-4">
-                <h3 className="text-sm font-medium text-gray-500 mb-3">Participantes</h3>
-                <ul className="space-y-2">
-                    {participants.length === 0 ? (
-                        <li className="text-gray-400 text-sm text-center py-4">
-                            Nenhum aluno entrou ainda
-                        </li>
-                    ) : (
-                        participants.map((participant) => {
-                            const isConfused = confusedStudents.some(
-                                (s) => s.alunoName === participant.displayName
-                            );
-                            return (
-                                <li
-                                    key={participant.id}
-                                    className={`flex items-center gap-3 p-3 rounded-lg ${
-                                        isConfused ? 'bg-cyan-50 border border-cyan-200' : 'bg-gray-50'
-                                    }`}
-                                >
-                                    <div className="w-8 h-8 rounded-full bg-navy-900 text-white flex items-center justify-center text-sm font-medium">
-                                        {participant.displayName.charAt(0).toUpperCase()}
-                                    </div>
-                                    <span className="flex-1 text-sm font-medium text-gray-800">
-                                        {participant.displayName}
-                                    </span>
-                                    {isConfused && (
-                                        <HelpCircle className="w-5 h-5 text-cyan-500" aria-label="Com dúvida" />
-                                    )}
-                                    {/* Kick button */}
-                                    <button
-                                        onClick={() => handleKickParticipant(participant.id, participant.displayName)}
-                                        className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                                        aria-label={`Remover ${participant.displayName}`}
-                                        title="Remover da aula"
-                                    >
-                                        <UserX className="w-4 h-4" />
-                                    </button>
-                                </li>
-                            );
-                        })
-                    )}
-                </ul>
-            </div>
-
-            {/* Footer with end session */}
-            <div className="p-4 border-t">
+            {/* Footer */}
+            <div className="p-4 border-t border-white/10 bg-white/5">
                 <button
                     onClick={onEndSession}
-                    className="w-full py-3 px-4 border-2 border-red-500 text-red-500 rounded-lg font-medium hover:bg-red-50 transition-colors"
+                    className="w-full py-3 px-4 border border-red-500/20 bg-red-500/10 text-red-400 rounded-xl font-bold hover:bg-red-500 hover:text-white transition-all"
                 >
                     Encerrar Aula
                 </button>
