@@ -34,8 +34,7 @@ export function StudentRoom() {
         mainRoomName: roomName || '',
     });
 
-    // Listen for room signals and quizzes
-    useRoomSignaling({
+    const { isConnected, sendSignal } = useRoomSignaling({
         sessionId: apiSessionId,
         onMoveToRoom: (newRoom) => {
             console.log('[Student] Switching to room:', newRoom);
@@ -45,10 +44,17 @@ export function StudentRoom() {
             if (payload.type === 'QUIZ_RECEIVED') {
                 console.log('[Student] Quiz received:', payload.quiz);
                 setCurrentQuiz(payload.quiz);
-            } else if (payload.type === 'BREAKOUT_ASSIGNMENT' && payload.participantId === localParticipantId) {
+            } else if (
+                payload.type === 'BREAKOUT_ASSIGNMENT'
+                && (payload.studentId === studentId || payload.participantId === localParticipantId)
+            ) {
                 console.log('[Student] Breakout assignment received:', payload.roomName);
                 setCurrentRoomName(payload.roomName);
-            } else if (payload.type === 'BREAKOUT_RESET' && payload.roomName) {
+            } else if (
+                payload.type === 'BREAKOUT_RESET'
+                && payload.roomName
+                && (!payload.studentId || payload.studentId === studentId || payload.participantId === localParticipantId)
+            ) {
                 console.log('[Student] Returning to main room:', payload.roomName);
                 setCurrentRoomName(payload.roomName);
             } else if (payload.type === 'REACTION') {
@@ -73,6 +79,20 @@ export function StudentRoom() {
                 });
         }
     }, [apiSessionId, studentName]);
+
+    useEffect(() => {
+        if (!apiSessionId || !localParticipantId || !isConnected) {
+            return;
+        }
+
+        void sendSignal('app-signal', {
+            type: 'STUDENT_PRESENCE',
+            participantId: localParticipantId,
+            studentId,
+            studentName,
+            currentRoomName,
+        });
+    }, [apiSessionId, currentRoomName, isConnected, localParticipantId, sendSignal, studentId, studentName]);
 
     const handleMeetingEnd = useCallback(async () => {
         resetRoomName();

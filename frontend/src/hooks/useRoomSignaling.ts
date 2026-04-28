@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { supabase, getRoomChannel } from '@/supabase';
 
 interface UseRoomSignalingOptions {
@@ -11,6 +11,7 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
     const channelRef = useRef<ReturnType<typeof getRoomChannel> | null>(null);
     const onMoveToRoomRef = useRef(onMoveToRoom);
     const onBroadcastReceivedRef = useRef(onBroadcastReceived);
+    const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
         onMoveToRoomRef.current = onMoveToRoom;
@@ -23,6 +24,7 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
     useEffect(() => {
         if (!sessionId) {
             channelRef.current = null;
+            setIsConnected(false);
             return;
         }
 
@@ -42,17 +44,24 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
             })
             .subscribe(async (status, err) => {
                 if (status === 'SUBSCRIBED') {
+                    setIsConnected(true);
                     console.log(`[Realtime] Subscribed to room channel: ${sessionId}`);
                 }
                 if (status === 'CHANNEL_ERROR') {
+                    setIsConnected(false);
                     console.error('[Realtime] Channel error:', err);
                 }
                 if (status === 'TIMED_OUT') {
+                    setIsConnected(false);
                     console.warn('[Realtime] Connection timed out. Retrying...');
+                }
+                if (status === 'CLOSED') {
+                    setIsConnected(false);
                 }
             });
 
         return () => {
+            setIsConnected(false);
             if (channelRef.current === channel) {
                 channelRef.current = null;
             }
@@ -80,6 +89,7 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
     }, [sendSignal]);
 
     return {
+        isConnected,
         sendSignal,
         moveToRoom,
     };

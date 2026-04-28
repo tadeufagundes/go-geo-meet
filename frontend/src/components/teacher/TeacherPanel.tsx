@@ -1,8 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Users, HelpCircle, Shuffle, X, Monitor, MicOff, UserX, LayoutGrid, Brain, Zap, Trophy, Music, Heart } from 'lucide-react';
 import { useTeacherFeedback } from '@/hooks/useFeedback';
 import { useRoomSignaling } from '@/hooks/useRoomSignaling';
 import type { Participant } from '@/types';
+import {
+    resolveStudentPresenceSync,
+    type StudentPresencePayload,
+} from './teacherBreakoutSync';
 
 interface TeacherPanelProps {
     sessionId: string;
@@ -36,6 +40,8 @@ export function TeacherPanel({
     const [aiInsights, setAiInsights] = useState<{id: string, text: string, type: 'error' | 'tip'}[]>([]);
     const [breakoutRooms, setBreakoutRooms] = useState<string[]>([]);
     const [participantRooms, setParticipantRooms] = useState<Record<string, string>>({});
+    const [participantStudentIds, setParticipantStudentIds] = useState<Record<string, string>>({});
+    const [studentAssignments, setStudentAssignments] = useState<Record<string, string>>({});
 
     const { confusedCount } = useTeacherFeedback({
         sessionId,
@@ -47,9 +53,73 @@ export function TeacherPanel({
         onBroadcastReceived: (payload) => {
             if (payload.type === 'AI_INSIGHT') {
                 setAiInsights(prev => [payload.insight, ...prev].slice(0, 5));
+                return;
+            }
+
+            if (payload.type !== 'STUDENT_PRESENCE') {
+                return;
+            }
+
+            const studentPresence = payload as StudentPresencePayload;
+            const participantAssignedRoom = participantRooms[studentPresence.participantId];
+            const stableAssignedRoom = studentAssignments[studentPresence.studentId] ?? participantAssignedRoom;
+            const syncResolution = resolveStudentPresenceSync({
+                assignedRoomName: stableAssignedRoom,
+                breakoutRooms,
+                mainRoomName: roomName,
+                currentRoomName: studentPresence.currentRoomName,
+            });
+
+            setParticipantStudentIds((prev) => ({
+                ...prev,
+                [studentPresence.participantId]: studentPresence.studentId,
+            }));
+
+            setParticipantRooms((prev) => ({
+                ...prev,
+                [studentPresence.participantId]: syncResolution.displayRoomName,
+            }));
+
+            if (stableAssignedRoom && stableAssignedRoom !== roomName) {
+                setStudentAssignments((prev) => ({
+                    ...prev,
+                    [studentPresence.studentId]: stableAssignedRoom,
+                }));
+            }
+
+            if (syncResolution.action === 'assign') {
+                onSendToBreakoutRoom?.(studentPresence.participantId, syncResolution.targetRoomName);
+                sendSignal('app-signal', {
+                    type: 'BREAKOUT_ASSIGNMENT',
+                    participantId: studentPresence.participantId,
+                    studentId: studentPresence.studentId,
+                    roomName: syncResolution.targetRoomName,
+                    mainRoomName: roomName,
+                });
+            }
+
+            if (syncResolution.action === 'reset') {
+                sendSignal('app-signal', {
+                    type: 'BREAKOUT_RESET',
+                    participantId: studentPresence.participantId,
+                    studentId: studentPresence.studentId,
+                    roomName,
+                });
             }
         }
     });
+
+    useEffect(() => {
+        const activeParticipantIds = new Set(participants.map((participant) => participant.id));
+
+        setParticipantRooms((prev) => Object.fromEntries(
+            Object.entries(prev).filter(([participantId]) => activeParticipantIds.has(participantId))
+        ));
+
+        setParticipantStudentIds((prev) => Object.fromEntries(
+            Object.entries(prev).filter(([participantId]) => activeParticipantIds.has(participantId))
+        ));
+    }, [participants]);
 
     const handlePickRandom = useCallback(() => {
         if (participants.length === 0) return;
@@ -80,14 +150,27 @@ export function TeacherPanel({
         }
 
         const rooms = Array.from({ length: roomCount }, (_, index) => `Sala ${index + 1}`);
+        const removedAssignments = Object.entries(participantRooms).filter(([, assignedRoom]) => !rooms.includes(assignedRoom));
 
         breakoutRooms
             .filter((existingRoom) => !rooms.includes(existingRoom))
             .forEach((staleRoom) => onRemoveBreakoutRoom?.(staleRoom));
 
+        removedAssignments.forEach(([participantId]) => {
+            sendSignal('app-signal', {
+                type: 'BREAKOUT_RESET',
+                participantId,
+                studentId: participantStudentIds[participantId],
+                roomName,
+            });
+        });
+
         rooms.forEach((name) => onAddBreakoutRoom?.(name));
         setBreakoutRooms(rooms);
         setParticipantRooms((prev) => Object.fromEntries(
+            Object.entries(prev).filter(([, assignedRoom]) => rooms.includes(assignedRoom))
+        ));
+        setStudentAssignments((prev) => Object.fromEntries(
             Object.entries(prev).filter(([, assignedRoom]) => rooms.includes(assignedRoom))
         ));
         sendSignal('app-signal', {
@@ -95,9 +178,11 @@ export function TeacherPanel({
             rooms,
             mainRoomName: roomName,
         });
-    }, [breakoutRooms, onAddBreakoutRoom, onRemoveBreakoutRoom, roomName, sendSignal]);
+    }, [breakoutRooms, onAddBreakoutRoom, onRemoveBreakoutRoom, participantRooms, participantStudentIds, roomName, sendSignal]);
 
     const handleAssignParticipant = useCallback((participant: Participant, nextRoom: string) => {
+        const participantStudentId = participantStudentIds[participant.id];
+
         if (nextRoom !== roomName) {
             onSendToBreakoutRoom?.(participant.id, nextRoom);
         }
@@ -120,11 +205,26 @@ export function TeacherPanel({
                 [participant.id]: nextRoom,
             };
         });
-    }, [onSendToBreakoutRoom, roomName, sendSignal]);
+
+        if (participantStudentId) {
+            setStudentAssignments((prev) => {
+                if (nextRoom === roomName) {
+                    const { [participantStudentId]: _removed, ...rest } = prev;
+                    return rest;
+                }
+
+                return {
+                    ...prev,
+                    [participantStudentId]: nextRoom,
+                };
+            });
+        }
+    }, [onSendToBreakoutRoom, participantStudentIds, roomName, sendSignal]);
 
     const handleReturnEveryone = useCallback(() => {
         moveToRoom(roomName);
         setParticipantRooms({});
+        setStudentAssignments({});
         sendSignal('app-signal', {
             type: 'BREAKOUT_RESET',
             roomName,
