@@ -9,7 +9,7 @@ interface UseJitsiOptions {
     onParticipantJoined?: (participant: Participant) => void;
     onParticipantLeft?: (participantId: string) => void;
     onMeetingEnd?: () => void;
-    onReady?: () => void;
+    onReady?: (participantId: string) => void;
 }
 
 /**
@@ -202,7 +202,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
                 console.log('[Jitsi] Teacher joined as:', event.id);
             }
             
-            onReady?.();
+            onReady?.(event.id);
         }) as unknown as () => void);
 
         // Failsafe: Se o evento não disparar em 5 segundos, libera a tela

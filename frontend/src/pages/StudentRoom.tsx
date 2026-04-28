@@ -21,6 +21,7 @@ export function StudentRoom() {
     const [currentRoomName, setCurrentRoomName] = useState(roomName || '');
     const [currentQuiz, setCurrentQuiz] = useState<QuizQuestion | null>(null);
     const [activeReaction, setActiveReaction] = useState<string | null>(null);
+    const [localParticipantId, setLocalParticipantId] = useState<string | null>(null);
     const [studentId] = useState(() => `student-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
     const hasJoined = useRef(false);
 
@@ -35,7 +36,7 @@ export function StudentRoom() {
             if (payload.type === 'QUIZ_RECEIVED') {
                 console.log('[Student] Quiz received:', payload.quiz);
                 setCurrentQuiz(payload.quiz);
-            } else if (payload.type === 'BREAKOUT_ASSIGNMENT' && payload.participantName === studentName) {
+            } else if (payload.type === 'BREAKOUT_ASSIGNMENT' && payload.participantId === localParticipantId) {
                 console.log('[Student] Breakout assignment received:', payload.roomName);
                 setCurrentRoomName(payload.roomName);
             } else if (payload.type === 'BREAKOUT_RESET' && payload.roomName) {
@@ -155,7 +156,10 @@ export function StudentRoom() {
                         displayName={studentName}
                         role="student"
                         onMeetingEnd={handleMeetingEnd}
-                        onReady={() => setIsReady(true)}
+                        onReady={(participantId) => {
+                            setLocalParticipantId(participantId);
+                            setIsReady(true);
+                        }}
                         className="h-full"
                     />
                     

@@ -96,7 +96,7 @@ export function TeacherPanel({
 
         sendSignal('app-signal', {
             type: 'BREAKOUT_ASSIGNMENT',
-            participantName: participant.displayName,
+            participantId: participant.id,
             roomName: nextRoom,
             mainRoomName: roomName,
         });
@@ -301,10 +301,22 @@ export function TeacherPanel({
                     <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Participantes</h3>
                     <div className="space-y-3">
                         {participants.length === 0 ? (
-                            <p className="text-gray-600 text-xs italic px-1">Nenhum aluno conectado</p>
+                            // Skeleton Loading State
+                            <>
+                                {[1, 2, 3].map((i) => (
+                                    <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/5 animate-pulse">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-white/10" />
+                                            <div className="space-y-2 flex-1">
+                                                <div className="h-3 w-24 bg-white/10 rounded" />
+                                                <div className="h-2 w-12 bg-white/5 rounded" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </>
                         ) : (
                             participants.map((participant) => {
-                                const engagement = 60 + ((participant.displayName.length * 7 + participant.id.length) % 41);
                                 const currentRoom = participantRooms[participant.id] ?? roomName;
 
                                 return (

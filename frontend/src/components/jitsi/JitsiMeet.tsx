@@ -10,7 +10,7 @@ interface JitsiMeetProps {
     onParticipantJoined?: (participant: Participant) => void;
     onParticipantLeft?: (participantId: string) => void;
     onMeetingEnd?: () => void;
-    onReady?: () => void;
+    onReady?: (participantId: string) => void;
     className?: string;
 }
 

@@ -32,26 +32,40 @@ const subscribeToSignals = () => {
             const { sessionId, roomName, action } = payload;
             
             if (action === 'START') {
-                console.log(`[Bot] Spawning bot for room: ${roomName}`);
-                const botInstance = await spawnBot(sessionId, roomName);
-                activeBots.set(sessionId, botInstance);
+                console.log(`[Bot] Requesting bot for room: ${roomName}`);
+                try {
+                    // Evitar múltiplos bots para a mesma sessão
+                    if (activeBots.has(sessionId)) {
+                        console.warn(`[Bot] Session ${sessionId} already has an active bot.`);
+                        return;
+                    }
 
-                // SIMULAÇÃO: Enviar o primeiro insight após 5 segundos
-                setTimeout(async () => {
-                    console.log('[AI] Sending first insight...');
-                    await supabase.channel(`room:${sessionId}`).send({
-                        type: 'broadcast',
-                        event: 'app-signal',
-                        payload: {
-                            type: 'AI_INSIGHT',
-                            insight: {
-                                id: `in-${Date.now()}`,
-                                text: 'Detectado uso de "You is" em vez de "You are".',
-                                type: 'error'
-                            }
-                        }
+                    const botInstance = await spawnBot(sessionId, roomName);
+                    
+                    // Monitorar se o bot fechar inesperadamente
+                    botInstance.on('close', () => {
+                        console.log(`[Bot] Bot for ${sessionId} closed.`);
+                        activeBots.delete(sessionId);
                     });
-                }, 5000);
+
+                    activeBots.set(sessionId, botInstance);
+                    console.log(`[Bot] Bot successfully spawned for ${sessionId}`);
+
+                    // Insight inicial de boas-vindas
+                    setTimeout(async () => {
+                        await supabase.channel(`room:${sessionId}`).send({
+                            type: 'broadcast',
+                            event: 'app-signal',
+                            payload: {
+                                type: 'AI_INSIGHT',
+                                insight: { id: `in-${Date.now()}`, text: 'LARA AI está conectada e ouvindo a sala.', type: 'tip' }
+                            }
+                        });
+                    }, 3000);
+                } catch (err) {
+                    console.error(`[Bot] Failed to spawn bot for ${sessionId}:`, err);
+                    // Notificar frontend da falha se necessário
+                }
             } else if (action === 'STOP_AND_GENERATE') {
                 console.log(`[AI] Analyzing session transcript for: ${sessionId}`);
                 
