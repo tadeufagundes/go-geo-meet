@@ -13,6 +13,7 @@ interface TeacherPanelProps {
     onMuteAll?: () => void;
     onKickParticipant?: (participantId: string) => void;
     onAddBreakoutRoom?: (name: string) => void;
+    onRemoveBreakoutRoom?: (name: string) => void;
     onSendToBreakoutRoom?: (participantId: string, roomName: string) => void;
 }
 
@@ -25,6 +26,7 @@ export function TeacherPanel({
     onMuteAll,
     onKickParticipant,
     onAddBreakoutRoom,
+    onRemoveBreakoutRoom,
     onSendToBreakoutRoom,
 }: TeacherPanelProps) {
     const [isOpen, setIsOpen] = useState(true);
@@ -79,15 +81,21 @@ export function TeacherPanel({
 
         const rooms = Array.from({ length: roomCount }, (_, index) => `Sala ${index + 1}`);
 
-        setBreakoutRooms(rooms);
-        setParticipantRooms({});
+        breakoutRooms
+            .filter((existingRoom) => !rooms.includes(existingRoom))
+            .forEach((staleRoom) => onRemoveBreakoutRoom?.(staleRoom));
+
         rooms.forEach((name) => onAddBreakoutRoom?.(name));
+        setBreakoutRooms(rooms);
+        setParticipantRooms((prev) => Object.fromEntries(
+            Object.entries(prev).filter(([, assignedRoom]) => rooms.includes(assignedRoom))
+        ));
         sendSignal('app-signal', {
             type: 'BREAKOUT_STARTED',
             rooms,
             mainRoomName: roomName,
         });
-    }, [breakoutRooms.length, onAddBreakoutRoom, roomName, sendSignal]);
+    }, [breakoutRooms, onAddBreakoutRoom, onRemoveBreakoutRoom, roomName, sendSignal]);
 
     const handleAssignParticipant = useCallback((participant: Participant, nextRoom: string) => {
         if (nextRoom !== roomName) {

@@ -370,6 +370,11 @@ export function TeacherRoom() {
                                         jitsiApiRef.current.executeCommand('addBreakoutRoom', name);
                                     }
                                 }}
+                                onRemoveBreakoutRoom={(name) => {
+                                    if (jitsiApiRef.current) {
+                                        jitsiApiRef.current.executeCommand('removeBreakoutRoom', name);
+                                    }
+                                }}
                                 onSendToBreakoutRoom={(pid, rname) => {
                                     if (jitsiApiRef.current) {
                                         jitsiApiRef.current.executeCommand('sendParticipantToRoom', { participantId: pid, roomName: rname });
