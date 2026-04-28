@@ -4,7 +4,7 @@ import { JitsiMeet } from '../components/jitsi/JitsiMeet';
 import { FeedbackButton } from '../components/student/FeedbackButton';
 import { BroadcastView } from '../components/student/BroadcastView';
 import { QuizModal, type QuizQuestion } from '../components/student/QuizModal';
-import { Video, LogOut, Monitor, Users } from 'lucide-react';
+import { Video, LogOut, Users } from 'lucide-react';
 import * as attendanceService from '../services/attendanceService';
 import { useRoomSignaling } from '../hooks/useRoomSignaling';
 
@@ -35,6 +35,12 @@ export function StudentRoom() {
             if (payload.type === 'QUIZ_RECEIVED') {
                 console.log('[Student] Quiz received:', payload.quiz);
                 setCurrentQuiz(payload.quiz);
+            } else if (payload.type === 'BREAKOUT_ASSIGNMENT' && payload.participantName === studentName) {
+                console.log('[Student] Breakout assignment received:', payload.roomName);
+                setCurrentRoomName(payload.roomName);
+            } else if (payload.type === 'BREAKOUT_RESET' && payload.roomName) {
+                console.log('[Student] Returning to main room:', payload.roomName);
+                setCurrentRoomName(payload.roomName);
             } else if (payload.type === 'REACTION') {
                 console.log('[Student] Reaction received:', payload.emoji);
                 setActiveReaction(payload.emoji);

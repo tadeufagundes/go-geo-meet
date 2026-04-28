@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Users, HelpCircle, Shuffle, X, ChevronRight, Monitor, MicOff, UserX, LayoutGrid, ArrowRight, Brain, Zap, Trophy, Music, Heart } from 'lucide-react';
+import { Users, HelpCircle, Shuffle, X, Monitor, MicOff, UserX, LayoutGrid, Brain, Zap, Trophy, Music, Heart } from 'lucide-react';
 import { useTeacherFeedback } from '@/hooks/useFeedback';
 import { useRoomSignaling } from '@/hooks/useRoomSignaling';
 import type { Participant } from '@/types';
@@ -32,6 +32,8 @@ export function TeacherPanel({
     const [isSharing, setIsSharing] = useState(false);
     const [isAiListening, setIsAiListening] = useState(false);
     const [aiInsights, setAiInsights] = useState<{id: string, text: string, type: 'error' | 'tip'}[]>([]);
+    const [breakoutRooms, setBreakoutRooms] = useState<string[]>([]);
+    const [participantRooms, setParticipantRooms] = useState<Record<string, string>>({});
 
     const { confusedCount } = useTeacherFeedback({
         sessionId,
@@ -54,6 +56,72 @@ export function TeacherPanel({
         setSelectedStudent(student.displayName);
         setTimeout(() => setSelectedStudent(null), 5000);
     }, [participants]);
+
+    const handleShareScreen = useCallback(() => {
+        setIsSharing((prev) => !prev);
+        onShareScreen?.();
+    }, [onShareScreen]);
+
+    const handleCreateBreakoutRooms = useCallback(() => {
+        const initialValue = breakoutRooms.length > 0 ? String(breakoutRooms.length) : '2';
+        const countInput = window.prompt('Quantas salas?', initialValue);
+
+        if (!countInput) {
+            return;
+        }
+
+        const roomCount = Number.parseInt(countInput, 10);
+
+        if (!Number.isFinite(roomCount) || roomCount < 2) {
+            window.alert('Informe pelo menos 2 salas.');
+            return;
+        }
+
+        const rooms = Array.from({ length: roomCount }, (_, index) => `Sala ${index + 1}`);
+
+        setBreakoutRooms(rooms);
+        setParticipantRooms({});
+        rooms.forEach((name) => onAddBreakoutRoom?.(name));
+        sendSignal('app-signal', {
+            type: 'BREAKOUT_STARTED',
+            rooms,
+            mainRoomName: roomName,
+        });
+    }, [breakoutRooms.length, onAddBreakoutRoom, roomName, sendSignal]);
+
+    const handleAssignParticipant = useCallback((participant: Participant, nextRoom: string) => {
+        if (nextRoom !== roomName) {
+            onSendToBreakoutRoom?.(participant.id, nextRoom);
+        }
+
+        sendSignal('app-signal', {
+            type: 'BREAKOUT_ASSIGNMENT',
+            participantName: participant.displayName,
+            roomName: nextRoom,
+            mainRoomName: roomName,
+        });
+
+        setParticipantRooms((prev) => {
+            if (nextRoom === roomName) {
+                const { [participant.id]: _removed, ...rest } = prev;
+                return rest;
+            }
+
+            return {
+                ...prev,
+                [participant.id]: nextRoom,
+            };
+        });
+    }, [onSendToBreakoutRoom, roomName, sendSignal]);
+
+    const handleReturnEveryone = useCallback(() => {
+        moveToRoom(roomName);
+        setParticipantRooms({});
+        sendSignal('app-signal', {
+            type: 'BREAKOUT_RESET',
+            roomName,
+        });
+    }, [moveToRoom, roomName, sendSignal]);
 
     if (!isOpen) {
         return (
@@ -139,6 +207,10 @@ export function TeacherPanel({
 
                 {/* Quick Actions */}
                 <div className="space-y-2">
+                    <button onClick={handleShareScreen} className={`w-full flex items-center justify-between p-3 rounded-xl transition-colors group ${isSharing ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}>
+                        <span className="text-sm font-medium">{isSharing ? 'Parar Compartilhamento' : 'Compartilhar Tela'}</span>
+                        <Monitor className="w-4 h-4 group-hover:text-cyan-400" />
+                    </button>
                     <button onClick={onMuteAll} className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl text-gray-300 hover:bg-white/10 transition-colors group">
                         <span className="text-sm font-medium">Mutar Todos</span>
                         <MicOff className="w-4 h-4 group-hover:text-red-400" />
@@ -148,19 +220,52 @@ export function TeacherPanel({
                         <Shuffle className="w-4 h-4 group-hover:text-cyan-400" />
                     </button>
                     <button 
-                        onClick={() => {
-                            const count = window.prompt('Quantas salas?', '2');
-                            if (count) {
-                                const n = parseInt(count);
-                                for (let i = 1; i <= n; i++) onAddBreakoutRoom?.(`Sala ${i}`);
-                                sendSignal('app-signal', { type: 'BREAKOUT_STARTED', count: n });
-                            }
-                        }}
+                        onClick={handleCreateBreakoutRooms}
                         className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl text-gray-300 hover:bg-white/10 transition-colors group"
                     >
-                        <span className="text-sm font-medium">Breakout Rooms</span>
+                        <span className="text-sm font-medium">{breakoutRooms.length > 0 ? 'Reconfigurar Salas' : 'Criar Breakout Rooms'}</span>
                         <LayoutGrid className="w-4 h-4 group-hover:text-indigo-400" />
                     </button>
+                </div>
+
+                {/* Breakout Rooms */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                        <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Breakout Rooms</h3>
+                        {breakoutRooms.length > 0 && (
+                            <button
+                                onClick={handleReturnEveryone}
+                                className="text-[10px] font-bold uppercase tracking-wide text-cyan-400 hover:text-cyan-300 transition-colors"
+                            >
+                                Trazer Todos
+                            </button>
+                        )}
+                    </div>
+                    {breakoutRooms.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-4 text-xs text-gray-500">
+                            Crie salas para distribuir os alunos sem tirar a turma da sala principal.
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {breakoutRooms.map((breakoutRoom) => {
+                                const occupants = Object.values(participantRooms).filter((value) => value === breakoutRoom).length;
+
+                                return (
+                                    <div key={breakoutRoom} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
+                                        <div>
+                                            <p className="text-sm font-semibold text-white">{breakoutRoom}</p>
+                                            <p className="text-[10px] uppercase tracking-wide text-gray-500">
+                                                {occupants} aluno{occupants === 1 ? '' : 's'} alocado{occupants === 1 ? '' : 's'}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-full bg-indigo-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-300">
+                                            Ativa
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 {/* Soundboard - Pedagogical Reinforcement */}
@@ -198,40 +303,82 @@ export function TeacherPanel({
                         {participants.length === 0 ? (
                             <p className="text-gray-600 text-xs italic px-1">Nenhum aluno conectado</p>
                         ) : (
-                            participants.map(p => (
-                                <div key={p.id} className="group p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-cyan-500/30 transition-all relative overflow-hidden">
+                            participants.map((participant) => {
+                                const engagement = 60 + ((participant.displayName.length * 7 + participant.id.length) % 41);
+                                const currentRoom = participantRooms[participant.id] ?? roomName;
+
+                                return (
+                                <div key={participant.id} className="group p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-cyan-500/30 transition-all relative overflow-hidden">
                                     <div className="flex items-center justify-between relative z-10">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-white font-bold border border-white/10 text-xs">
-                                                {p.displayName.charAt(0).toUpperCase()}
+                                                {participant.displayName.charAt(0).toUpperCase()}
                                             </div>
                                             <div>
-                                                <h4 className="text-sm font-semibold text-white">{p.displayName}</h4>
+                                                <h4 className="text-sm font-semibold text-white">{participant.displayName}</h4>
                                                 <div className="flex items-center gap-1 mt-0.5">
                                                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                                                     <span className="text-[9px] text-gray-500 uppercase tracking-tight">Ativo</span>
                                                 </div>
                                             </div>
                                         </div>
-                                        <button onClick={() => onKickParticipant?.(p.id)} className="p-2 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all">
+                                        <button onClick={() => onKickParticipant?.(participant.id)} className="p-2 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all">
                                             <UserX className="w-4 h-4" />
                                         </button>
                                     </div>
-                                    {/* Engagement Meter */}
-                                    <div className="mt-4 relative z-10">
-                                        <div className="flex justify-between text-[9px] text-gray-500 mb-1.5">
-                                            <span className="flex items-center gap-1 uppercase font-bold tracking-tighter"><Zap className="w-2.5 h-2.5 text-yellow-500" /> Engajamento</span>
-                                            <span className="font-mono">{Math.floor(Math.random() * 40 + 60)}%</span>
+                                    {/* Engagement Meter - Deterministic for performance stability */}
+                                    {(() => {
+                                        // Use ID as seed for stable engagement value during session
+                                        const hash = participant.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                                        const engagement = 60 + (hash % 35);
+                                        return (
+                                            <div className="mt-4 relative z-10">
+                                                <div className="flex justify-between text-[9px] text-gray-500 mb-1.5">
+                                                    <span className="flex items-center gap-1 uppercase font-bold tracking-tighter">
+                                                        <Zap className="w-2.5 h-2.5 text-yellow-500" /> Engajamento
+                                                    </span>
+                                                    <span className="font-mono">{engagement}%</span>
+                                                </div>
+                                                <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                                                    <div 
+                                                        className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-1000" 
+                                                        style={{ width: `${engagement}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {breakoutRooms.length > 0 && (
+                                        <div className="mt-4 space-y-2 rounded-2xl border border-white/5 bg-navy-950/50 p-3">
+                                            <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-gray-500">
+                                                <span>Sala Atual</span>
+                                                <span className="font-bold text-cyan-300">
+                                                    {currentRoom === roomName ? 'Sala Geral' : currentRoom}
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    onClick={() => handleAssignParticipant(participant, roomName)}
+                                                    className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${currentRoom === roomName ? 'bg-cyan-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}
+                                                >
+                                                    Geral
+                                                </button>
+                                                {breakoutRooms.map((breakoutRoom) => (
+                                                    <button
+                                                        key={`${participant.id}-${breakoutRoom}`}
+                                                        onClick={() => handleAssignParticipant(participant, breakoutRoom)}
+                                                        className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide transition-colors ${currentRoom === breakoutRoom ? 'bg-indigo-500 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}
+                                                    >
+                                                        {breakoutRoom}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                                            <div 
-                                                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-1000" 
-                                                style={{ width: `${Math.floor(Math.random() * 40 + 60)}%` }}
-                                            />
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>

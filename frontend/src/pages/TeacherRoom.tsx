@@ -361,6 +361,7 @@ export function TeacherRoom() {
                                 sessionId={apiSessionId}
                                 roomName={roomName}
                                 participants={participants}
+                                onEndSession={handleEndSession}
                                 onShareScreen={handleShareScreen}
                                 onMuteAll={handleMuteAll}
                                 onKickParticipant={handleKickParticipant}

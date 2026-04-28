@@ -24,14 +24,20 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
                 console.log('[Realtime] App signal received:', payload);
                 onBroadcastReceived?.(payload);
             })
-            .subscribe((status) => {
+            .subscribe(async (status, err) => {
                 if (status === 'SUBSCRIBED') {
                     console.log(`[Realtime] Subscribed to room channel: ${sessionId}`);
+                }
+                if (status === 'CHANNEL_ERROR') {
+                    console.error('[Realtime] Channel error:', err);
+                }
+                if (status === 'TIMED_OUT') {
+                    console.warn('[Realtime] Connection timed out. Retrying...');
                 }
             });
 
         return () => {
-            channel.unsubscribe();
+            supabase.removeChannel(channel);
         };
     }, [sessionId, onMoveToRoom, onBroadcastReceived]);
 
