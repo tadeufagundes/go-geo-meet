@@ -9,9 +9,50 @@ interface UseRoomSignalingOptions {
 
 export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived }: UseRoomSignalingOptions) {
     const channelRef = useRef<ReturnType<typeof getRoomChannel> | null>(null);
+    const aiChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+    const aiChannelSubscriptionRef = useRef<Promise<ReturnType<typeof supabase.channel>> | null>(null);
     const onMoveToRoomRef = useRef(onMoveToRoom);
     const onBroadcastReceivedRef = useRef(onBroadcastReceived);
     const [isConnected, setIsConnected] = useState(false);
+
+    const ensureAiSignalChannel = useCallback(async () => {
+        if (aiChannelRef.current) {
+            return aiChannelRef.current;
+        }
+
+        if (aiChannelSubscriptionRef.current) {
+            return aiChannelSubscriptionRef.current;
+        }
+
+        const aiChannel = supabase.channel('ai-signals');
+        aiChannelRef.current = aiChannel;
+
+        aiChannelSubscriptionRef.current = new Promise((resolve, reject) => {
+            aiChannel.subscribe((status, err) => {
+                if (status === 'SUBSCRIBED') {
+                    aiChannelSubscriptionRef.current = null;
+                    resolve(aiChannel);
+                    return;
+                }
+
+                if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    if (aiChannelRef.current === aiChannel) {
+                        aiChannelRef.current = null;
+                    }
+                    aiChannelSubscriptionRef.current = null;
+                    reject(err ?? new Error('AI signal channel unavailable.'));
+                    return;
+                }
+
+                if (status === 'CLOSED' && aiChannelRef.current === aiChannel) {
+                    aiChannelRef.current = null;
+                    aiChannelSubscriptionRef.current = null;
+                }
+            });
+        });
+
+        return aiChannelSubscriptionRef.current;
+    }, []);
 
     useEffect(() => {
         onMoveToRoomRef.current = onMoveToRoom;
@@ -66,14 +107,29 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
                 channelRef.current = null;
             }
             supabase.removeChannel(channel);
+
+            if (aiChannelRef.current) {
+                supabase.removeChannel(aiChannelRef.current);
+                aiChannelRef.current = null;
+                aiChannelSubscriptionRef.current = null;
+            }
         };
     }, [sessionId]);
 
     const sendSignal = useCallback(async (event: string, payload: any) => {
-        const channel = channelRef.current;
-
         if (!sessionId || !isSupabaseConfigured) {
             return;
+        }
+
+        let channel = channelRef.current;
+
+        if (event === 'ai-request') {
+            try {
+                channel = await ensureAiSignalChannel();
+            } catch (error) {
+                console.error('[Realtime] Cannot connect to AI signal channel:', error);
+                return;
+            }
         }
 
         if (!channel) {
@@ -86,7 +142,7 @@ export function useRoomSignaling({ sessionId, onMoveToRoom, onBroadcastReceived 
             event,
             payload,
         });
-    }, [sessionId]);
+    }, [ensureAiSignalChannel, sessionId]);
 
     const moveToRoom = useCallback((roomName: string) => {
         sendSignal('move-to-room', { roomName });

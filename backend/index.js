@@ -29,10 +29,10 @@ const subscribeToSignals = () => {
         .on('broadcast', { event: 'ai-request' }, async ({ payload }) => {
             console.log('[Signal] AI Request received:', payload);
             
-            const { sessionId, roomName, action } = payload;
+            const { sessionId, roomName, conferenceDomain, action } = payload;
             
             if (action === 'START') {
-                console.log(`[Bot] Requesting bot for room: ${roomName}`);
+                console.log(`[Bot] Requesting bot for room: ${roomName} on ${conferenceDomain || 'meet.jit.si'}`);
                 try {
                     // Evitar múltiplos bots para a mesma sessão
                     if (activeBots.has(sessionId)) {
@@ -40,7 +40,7 @@ const subscribeToSignals = () => {
                         return;
                     }
 
-                    const botInstance = await spawnBot(sessionId, roomName);
+                    const botInstance = await spawnBot(sessionId, roomName, conferenceDomain);
                     
                     // Monitorar se o bot fechar inesperadamente
                     botInstance.on('close', () => {

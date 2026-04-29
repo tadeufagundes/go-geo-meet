@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useRoomSignaling } from './useRoomSignaling';
 
-const { removeChannelMock, getRoomChannelMock, supabaseConfigState } = vi.hoisted(() => ({
+const { removeChannelMock, getRoomChannelMock, channelFactoryMock, supabaseConfigState } = vi.hoisted(() => ({
     removeChannelMock: vi.fn(),
     getRoomChannelMock: vi.fn(),
+    channelFactoryMock: vi.fn(),
     supabaseConfigState: { current: true },
 }));
 
@@ -17,6 +18,7 @@ vi.mock('@/supabase', () => ({
         return supabaseConfigState.current;
     },
     supabase: {
+        channel: channelFactoryMock,
         removeChannel: removeChannelMock,
     },
     getRoomChannel: getRoomChannelMock,
@@ -61,6 +63,7 @@ describe('useRoomSignaling', () => {
         supabaseConfigState.current = true;
         removeChannelMock.mockReset();
         getRoomChannelMock.mockReset();
+        channelFactoryMock.mockReset();
     });
 
     afterEach(() => {
@@ -92,6 +95,36 @@ describe('useRoomSignaling', () => {
             event: 'app-signal',
             payload: { type: 'PING' },
         });
+    });
+
+    it('routes ai-request signals through the dedicated ai-signals channel', async () => {
+        const roomChannel = createMockChannel();
+        const aiChannel = createMockChannel();
+        getRoomChannelMock.mockReturnValue(roomChannel);
+        channelFactoryMock.mockReturnValue(aiChannel);
+
+        let api!: ReturnType<typeof useRoomSignaling>;
+
+        render(
+            <Harness
+                sessionId="session-1"
+                onReady={(value) => {
+                    api = value;
+                }}
+            />
+        );
+
+        await act(async () => {
+            await api.sendSignal('ai-request', { action: 'START' });
+        });
+
+        expect(channelFactoryMock).toHaveBeenCalledWith('ai-signals');
+        expect(aiChannel.send).toHaveBeenCalledWith({
+            type: 'broadcast',
+            event: 'ai-request',
+            payload: { action: 'START' },
+        });
+        expect(roomChannel.send).not.toHaveBeenCalled();
     });
 
     it('keeps the same subscription while using the latest callbacks', () => {

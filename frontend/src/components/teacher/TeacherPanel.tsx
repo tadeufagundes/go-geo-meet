@@ -398,7 +398,7 @@ export function TeacherPanel({
                     {!isAiListening ? (
                         <button
                             onClick={() => {
-                                sendSignal('ai-request', { sessionId, roomName, action: 'START' });
+                                sendSignal('ai-request', { sessionId, roomName, conferenceDomain, action: 'START' });
                                 setIsAiListening(true);
                             }}
                             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:shadow-lg hover:shadow-purple-500/20 transition-all active:scale-95"
@@ -409,7 +409,7 @@ export function TeacherPanel({
                     ) : (
                         <button
                             onClick={() => {
-                                sendSignal('ai-request', { sessionId, roomName, action: 'STOP_AND_GENERATE' });
+                                sendSignal('ai-request', { sessionId, roomName, conferenceDomain, action: 'STOP_AND_GENERATE' });
                                 setIsAiListening(false);
                             }}
                             className="w-full flex items-center justify-center gap-2 bg-red-500/20 text-red-400 border border-red-500/30 py-3 px-4 rounded-xl font-bold hover:bg-red-500 hover:text-white transition-all animate-pulse"

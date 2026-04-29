@@ -1,10 +1,28 @@
 const puppeteer = require('puppeteer');
 
+function buildBotJoinUrl(roomName, conferenceDomain = 'meet.jit.si') {
+    return `https://${conferenceDomain}/${roomName}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=true`;
+}
+
+function createBotController(browser, roomName) {
+    return {
+        on(event, handler) {
+            if (event === 'close') {
+                browser.on('disconnected', handler);
+            }
+        },
+        close: async () => {
+            console.log(`[Puppeteer] Closing bot for ${roomName}`);
+            await browser.close();
+        }
+    };
+}
+
 /**
  * spawnBot - Joins a Jitsi room as a headless bot to capture audio.
  */
-async function spawnBot(sessionId, roomName) {
-    const jitsiUrl = `https://meet.jit.si/${roomName}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=true`;
+async function spawnBot(sessionId, roomName, conferenceDomain) {
+    const jitsiUrl = buildBotJoinUrl(roomName, conferenceDomain);
     
     console.log(`[Puppeteer] Bot joining: ${jitsiUrl}`);
 
@@ -35,12 +53,7 @@ async function spawnBot(sessionId, roomName) {
         // 2. Stream to a speech-to-text service
         
         // Return the control object
-        return {
-            close: async () => {
-                console.log(`[Puppeteer] Closing bot for ${roomName}`);
-                await browser.close();
-            }
-        };
+        return createBotController(browser, roomName);
 
     } catch (err) {
         console.error('[Puppeteer] Error:', err);
@@ -49,4 +62,4 @@ async function spawnBot(sessionId, roomName) {
     }
 }
 
-module.exports = { spawnBot };
+module.exports = { buildBotJoinUrl, createBotController, spawnBot };
