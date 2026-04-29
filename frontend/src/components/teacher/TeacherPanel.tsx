@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Users, HelpCircle, Shuffle, X, Monitor, MicOff, UserX, LayoutGrid, Brain, Zap, Trophy, Music, Heart } from 'lucide-react';
+import { Users, HelpCircle, Shuffle, X, Monitor, MicOff, UserX, LayoutGrid, Brain, Zap, Trophy, Music, Heart, Plus, Trash2 } from 'lucide-react';
 import { useTeacherFeedback } from '@/hooks/useFeedback';
 import { useRoomSignaling } from '@/hooks/useRoomSignaling';
 import { useTeacherBreakoutState } from '@/hooks/useTeacherBreakoutState';
@@ -8,6 +8,12 @@ import {
     resolveStudentPresenceSync,
     type StudentPresencePayload,
 } from './teacherBreakoutSync';
+import {
+    buildBreakoutRooms,
+    distributeParticipantsAcrossBreakoutRooms,
+    getNextBreakoutRoomName,
+    removeBreakoutRoomAssignments,
+} from './breakoutRoomManager';
 
 interface TeacherPanelProps {
     sessionId: string;
@@ -194,7 +200,7 @@ export function TeacherPanel({
             return;
         }
 
-        const rooms = Array.from({ length: roomCount }, (_, index) => `Sala ${index + 1}`);
+        const rooms = buildBreakoutRooms(roomCount);
         const removedAssignments = Object.entries(participantRooms).filter(([, assignedRoom]) => !rooms.includes(assignedRoom));
 
         removedAssignments.forEach(([participantId]) => {
@@ -216,6 +222,43 @@ export function TeacherPanel({
         sendSignal('app-signal', {
             type: 'BREAKOUT_STARTED',
             rooms,
+            mainRoomName: roomName,
+        });
+    }, [breakoutRooms, participantRooms, participantStudentIds, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
+
+    const handleAddBreakoutRoom = useCallback(() => {
+        const nextRoomName = getNextBreakoutRoomName(breakoutRooms);
+        const nextRooms = [...breakoutRooms, nextRoomName];
+
+        setBreakoutRooms(nextRooms);
+        sendSignal('app-signal', {
+            type: 'BREAKOUT_STARTED',
+            rooms: nextRooms,
+            mainRoomName: roomName,
+        });
+    }, [breakoutRooms, roomName, sendSignal, setBreakoutRooms]);
+
+    const handleRemoveBreakoutRoom = useCallback((breakoutRoom: string) => {
+        const affectedParticipantIds = Object.entries(participantRooms)
+            .filter(([, assignedRoom]) => assignedRoom === breakoutRoom)
+            .map(([participantId]) => participantId);
+        const nextRooms = breakoutRooms.filter((room) => room !== breakoutRoom);
+
+        affectedParticipantIds.forEach((participantId) => {
+            sendSignal('app-signal', {
+                type: 'BREAKOUT_RESET',
+                participantId,
+                studentId: participantStudentIds[participantId],
+                roomName,
+            });
+        });
+
+        setBreakoutRooms(nextRooms);
+        setParticipantRooms((prev) => removeBreakoutRoomAssignments(prev, breakoutRoom));
+        setStudentAssignments((prev) => removeBreakoutRoomAssignments(prev, breakoutRoom));
+        sendSignal('app-signal', {
+            type: 'BREAKOUT_STARTED',
+            rooms: nextRooms,
             mainRoomName: roomName,
         });
     }, [breakoutRooms, participantRooms, participantStudentIds, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
@@ -261,6 +304,25 @@ export function TeacherPanel({
             });
         }
     }, [onSendToBreakoutRoom, participantStudentIds, roomName, sendSignal, setStudentAssignments]);
+
+    const handleAutoDistributeParticipants = useCallback(() => {
+        if (breakoutRooms.length === 0) {
+            window.alert('Crie pelo menos uma breakout room antes de distribuir a turma.');
+            return;
+        }
+
+        const nextAssignments = distributeParticipantsAcrossBreakoutRooms(participants, breakoutRooms);
+
+        participants.forEach((participant) => {
+            const nextRoom = nextAssignments[participant.id];
+
+            if (!nextRoom) {
+                return;
+            }
+
+            handleAssignParticipant(participant, nextRoom);
+        });
+    }, [breakoutRooms, handleAssignParticipant, participants]);
 
     const handleReturnEveryone = useCallback(() => {
         moveToRoom(roomName);
@@ -375,6 +437,24 @@ export function TeacherPanel({
                         <span className="text-sm font-medium">{breakoutRooms.length > 0 ? 'Reconfigurar Salas' : 'Criar Breakout Rooms'}</span>
                         <LayoutGrid className="w-4 h-4 group-hover:text-indigo-400" />
                     </button>
+                    {breakoutRooms.length > 0 && (
+                        <>
+                            <button
+                                onClick={handleAddBreakoutRoom}
+                                className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl text-gray-300 hover:bg-white/10 transition-colors group"
+                            >
+                                <span className="text-sm font-medium">Adicionar Sala</span>
+                                <Plus className="w-4 h-4 group-hover:text-green-400" />
+                            </button>
+                            <button
+                                onClick={handleAutoDistributeParticipants}
+                                className="w-full flex items-center justify-between p-3 bg-white/5 rounded-xl text-gray-300 hover:bg-white/10 transition-colors group"
+                            >
+                                <span className="text-sm font-medium">Distribuir Automaticamente</span>
+                                <Shuffle className="w-4 h-4 group-hover:text-cyan-400" />
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Breakout Rooms */}
@@ -407,8 +487,17 @@ export function TeacherPanel({
                                                 {occupants} aluno{occupants === 1 ? '' : 's'} alocado{occupants === 1 ? '' : 's'}
                                             </p>
                                         </div>
-                                        <div className="rounded-full bg-indigo-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-300">
-                                            Ativa
+                                        <div className="flex items-center gap-2">
+                                            <div className="rounded-full bg-indigo-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-indigo-300">
+                                                Ativa
+                                            </div>
+                                            <button
+                                                onClick={() => handleRemoveBreakoutRoom(breakoutRoom)}
+                                                className="rounded-full p-2 text-gray-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                                                aria-label={`Remover ${breakoutRoom}`}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                         </div>
                                     </div>
                                 );
