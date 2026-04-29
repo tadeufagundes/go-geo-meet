@@ -31,7 +31,7 @@ describe('useTeacherBreakoutState', () => {
         cleanup();
     });
 
-    it('persists breakout rooms and student assignments across remounts in the same tab', () => {
+    it('persists breakout rooms, student assignments, and participant mappings across remounts in the same tab', () => {
         let firstValue!: ReturnType<typeof useTeacherBreakoutState>;
 
         const { unmount } = render(
@@ -54,6 +54,12 @@ describe('useTeacherBreakoutState', () => {
             });
         });
 
+        act(() => {
+            firstValue.setParticipantStudentIds({
+                participantA: 'studentA',
+            });
+        });
+
         unmount();
 
         let secondValue!: ReturnType<typeof useTeacherBreakoutState>;
@@ -71,6 +77,9 @@ describe('useTeacherBreakoutState', () => {
         expect(secondValue.breakoutRooms).toEqual(['Sala 1', 'Sala 2']);
         expect(secondValue.studentAssignments).toEqual({
             studentA: 'Sala 2',
+        });
+        expect(secondValue.participantStudentIds).toEqual({
+            participantA: 'studentA',
         });
     });
 

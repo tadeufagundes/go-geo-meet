@@ -50,12 +50,18 @@ export function TeacherPanel({
     const [isAiListening, setIsAiListening] = useState(false);
     const [aiInsights, setAiInsights] = useState<{id: string, text: string, type: 'error' | 'tip'}[]>([]);
     const [participantRooms, setParticipantRooms] = useState<Record<string, string>>({});
-    const [participantStudentIds, setParticipantStudentIds] = useState<Record<string, string>>({});
     const syncedBreakoutRoomsRef = useRef<string[]>([]);
     const hasRequestedPresenceSyncRef = useRef(false);
     const syncedConferenceDomainRef = useRef<string | null>(null);
 
-    const { breakoutRooms, setBreakoutRooms, studentAssignments, setStudentAssignments } = useTeacherBreakoutState({
+    const {
+        breakoutRooms,
+        setBreakoutRooms,
+        studentAssignments,
+        setStudentAssignments,
+        participantStudentIds,
+        setParticipantStudentIds,
+    } = useTeacherBreakoutState({
         sessionId: sessionId || roomName,
         mainRoomName: roomName,
     });
@@ -190,7 +196,20 @@ export function TeacherPanel({
         setParticipantStudentIds((prev) => Object.fromEntries(
             Object.entries(prev).filter(([participantId]) => activeParticipantIds.has(participantId))
         ));
-    }, [participants]);
+    }, [participants, setParticipantStudentIds]);
+
+    const getParticipantDisplayRoom = useCallback((participantId: string) => {
+        const participantRoom = participantRooms[participantId];
+
+        if (participantRoom) {
+            return participantRoom;
+        }
+
+        const studentId = participantStudentIds[participantId];
+        const assignedRoom = studentId ? studentAssignments[studentId] : undefined;
+
+        return assignedRoom || roomName;
+    }, [participantRooms, participantStudentIds, roomName, studentAssignments]);
 
     const handlePickRandom = useCallback(() => {
         if (participants.length === 0) return;
@@ -497,7 +516,7 @@ export function TeacherPanel({
                     ) : (
                         <div className="space-y-2">
                             {breakoutRooms.map((breakoutRoom) => {
-                                const occupants = Object.values(participantRooms).filter((value) => value === breakoutRoom).length;
+                                const occupants = participants.filter((participant) => getParticipantDisplayRoom(participant.id) === breakoutRoom).length;
 
                                 return (
                                     <div key={breakoutRoom} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
@@ -575,7 +594,7 @@ export function TeacherPanel({
                             </>
                         ) : (
                             participants.map((participant) => {
-                                const currentRoom = participantRooms[participant.id] ?? roomName;
+                                const currentRoom = getParticipantDisplayRoom(participant.id);
 
                                 return (
                                 <div key={participant.id} className="group p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-cyan-500/30 transition-all relative overflow-hidden">

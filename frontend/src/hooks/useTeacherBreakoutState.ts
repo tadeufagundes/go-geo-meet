@@ -77,6 +77,21 @@ function sanitizeStudentAssignments(value: unknown, breakoutRooms: string[]) {
     );
 }
 
+function sanitizeParticipantStudentIds(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {} as Record<string, string>;
+    }
+
+    return Object.fromEntries(
+        Object.entries(value).filter(([participantId, studentId]) => (
+            typeof participantId === 'string'
+            && participantId.length > 0
+            && typeof studentId === 'string'
+            && studentId.length > 0
+        ))
+    );
+}
+
 function areStringArraysEqual(left: string[], right: string[]) {
     return left.length === right.length && left.every((value, index) => value === right[index]);
 }
@@ -103,25 +118,35 @@ function getPersistedStudentAssignments(storageKey: string, breakoutRooms: strin
     return sanitizeStudentAssignments(parseJson(readSessionStorageValue(storageKey), {}), breakoutRooms);
 }
 
+function getPersistedParticipantStudentIds(storageKey: string) {
+    return sanitizeParticipantStudentIds(parseJson(readSessionStorageValue(storageKey), {}));
+}
+
 export function useTeacherBreakoutState({ sessionId, mainRoomName }: UseTeacherBreakoutStateOptions) {
     const storageScope = sessionId.trim() || mainRoomName.trim().toLowerCase() || 'default';
     const storageKeys = useMemo(() => ({
         breakoutRooms: buildStorageKey(storageScope, 'rooms'),
         studentAssignments: buildStorageKey(storageScope, 'student-assignments'),
+        participantStudentIds: buildStorageKey(storageScope, 'participant-student-ids'),
     }), [storageScope]);
 
     const [breakoutRoomsState, setBreakoutRoomsState] = useState(() => getPersistedBreakoutRooms(storageKeys.breakoutRooms, mainRoomName));
     const [studentAssignmentsState, setStudentAssignmentsState] = useState(() => getPersistedStudentAssignments(storageKeys.studentAssignments, breakoutRoomsState));
+    const [participantStudentIdsState, setParticipantStudentIdsState] = useState(() => getPersistedParticipantStudentIds(storageKeys.participantStudentIds));
 
     useEffect(() => {
         const nextBreakoutRooms = getPersistedBreakoutRooms(storageKeys.breakoutRooms, mainRoomName);
+        const nextParticipantStudentIds = getPersistedParticipantStudentIds(storageKeys.participantStudentIds);
 
         setBreakoutRoomsState((previousValue) => areStringArraysEqual(previousValue, nextBreakoutRooms) ? previousValue : nextBreakoutRooms);
         setStudentAssignmentsState((previousValue) => {
             const nextStudentAssignments = getPersistedStudentAssignments(storageKeys.studentAssignments, nextBreakoutRooms);
             return areAssignmentMapsEqual(previousValue, nextStudentAssignments) ? previousValue : nextStudentAssignments;
         });
-    }, [mainRoomName, storageKeys.breakoutRooms, storageKeys.studentAssignments]);
+        setParticipantStudentIdsState((previousValue) => {
+            return areAssignmentMapsEqual(previousValue, nextParticipantStudentIds) ? previousValue : nextParticipantStudentIds;
+        });
+    }, [mainRoomName, storageKeys.breakoutRooms, storageKeys.participantStudentIds, storageKeys.studentAssignments]);
 
     useEffect(() => {
         setStudentAssignmentsState((previousValue) => {
@@ -138,6 +163,10 @@ export function useTeacherBreakoutState({ sessionId, mainRoomName }: UseTeacherB
         writeSessionStorageValue(storageKeys.studentAssignments, JSON.stringify(studentAssignmentsState));
     }, [studentAssignmentsState, storageKeys.studentAssignments]);
 
+    useEffect(() => {
+        writeSessionStorageValue(storageKeys.participantStudentIds, JSON.stringify(participantStudentIdsState));
+    }, [participantStudentIdsState, storageKeys.participantStudentIds]);
+
     const setBreakoutRooms = useCallback((value: SetStateAction<string[]>) => {
         setBreakoutRoomsState((previousValue) => {
             const nextValue = sanitizeBreakoutRooms(resolveStateAction(value, previousValue), mainRoomName);
@@ -152,10 +181,19 @@ export function useTeacherBreakoutState({ sessionId, mainRoomName }: UseTeacherB
         });
     }, [breakoutRoomsState]);
 
+    const setParticipantStudentIds = useCallback((value: SetStateAction<Record<string, string>>) => {
+        setParticipantStudentIdsState((previousValue) => {
+            const nextValue = sanitizeParticipantStudentIds(resolveStateAction(value, previousValue));
+            return areAssignmentMapsEqual(previousValue, nextValue) ? previousValue : nextValue;
+        });
+    }, []);
+
     return {
         breakoutRooms: breakoutRoomsState,
         setBreakoutRooms,
         studentAssignments: studentAssignmentsState,
         setStudentAssignments,
+        participantStudentIds: participantStudentIdsState,
+        setParticipantStudentIds,
     };
 }
