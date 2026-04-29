@@ -59,7 +59,9 @@ function getOrCreatePersistedStudentId(storageKey: string) {
 }
 
 function getPersistedRoomName(storageKey: string, mainRoomName: string) {
-    return readSessionStorageValue(storageKey) || mainRoomName;
+    const persistedRoomName = readSessionStorageValue(storageKey);
+
+    return persistedRoomName === mainRoomName ? persistedRoomName : mainRoomName;
 }
 
 export function useStudentSessionState({ sessionId, studentName, mainRoomName }: UseStudentSessionStateOptions) {

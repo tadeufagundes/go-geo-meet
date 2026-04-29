@@ -32,7 +32,7 @@ describe('useStudentSessionState', () => {
         cleanup();
     });
 
-    it('keeps the same student id and breakout room across remounts in the same tab', () => {
+    it('keeps the same student id but falls back to the main room across remounts until the teacher reassigns breakout', () => {
         let firstValue!: ReturnType<typeof useStudentSessionState>;
 
         const { unmount } = render(
@@ -68,7 +68,7 @@ describe('useStudentSessionState', () => {
         );
 
         expect(secondValue.studentId).toBe(firstStudentId);
-        expect(secondValue.currentRoomName).toBe('Sala 2');
+        expect(secondValue.currentRoomName).toBe('Sala Principal');
     });
 
     it('resets the persisted room back to the main room when requested', () => {
