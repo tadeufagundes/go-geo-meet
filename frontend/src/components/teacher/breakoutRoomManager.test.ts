@@ -6,6 +6,7 @@ import {
     getNextBreakoutRoomName,
     removeBreakoutRoomAssignments,
     resolveParticipantRoomName,
+    resolveParticipantStudentId,
 } from './breakoutRoomManager';
 
 describe('breakoutRoomManager', () => {
@@ -25,12 +26,14 @@ describe('breakoutRoomManager', () => {
     it('falls back to the persisted student assignment when live participant room is not available', () => {
         expect(resolveParticipantRoomName({
             participantId: 'participant-1',
+            participantDisplayName: 'Ana Silva',
             participantRooms: {},
-            participantStudentIds: {
-                'participant-1': 'student-1',
-            },
+            participantStudentIds: {},
             studentAssignments: {
                 'student-1': 'Sala 2',
+            },
+            studentNames: {
+                'student-1': 'Ana Silva',
             },
             mainRoomName: 'Sala Geral',
         })).toBe('Sala 2');
@@ -39,6 +42,7 @@ describe('breakoutRoomManager', () => {
     it('prefers the live participant room when it is already known', () => {
         expect(resolveParticipantRoomName({
             participantId: 'participant-1',
+            participantDisplayName: 'Ana Silva',
             participantRooms: {
                 'participant-1': 'Sala 1',
             },
@@ -48,8 +52,34 @@ describe('breakoutRoomManager', () => {
             studentAssignments: {
                 'student-1': 'Sala 2',
             },
+            studentNames: {
+                'student-1': 'Ana Silva',
+            },
             mainRoomName: 'Sala Geral',
         })).toBe('Sala 1');
+    });
+
+    it('falls back to a unique persisted student id match by display name', () => {
+        expect(resolveParticipantStudentId({
+            participantId: 'participant-live',
+            participantDisplayName: '  Ana   Silva ',
+            participantStudentIds: {},
+            studentNames: {
+                'student-1': 'Ana Silva',
+            },
+        })).toBe('student-1');
+    });
+
+    it('does not guess a student id when the persisted display name match is ambiguous', () => {
+        expect(resolveParticipantStudentId({
+            participantId: 'participant-live',
+            participantDisplayName: 'Ana Silva',
+            participantStudentIds: {},
+            studentNames: {
+                'student-1': 'Ana Silva',
+                'student-2': 'Ana Silva',
+            },
+        })).toBeUndefined();
     });
 
     it('distributes participants across breakout rooms deterministically', () => {

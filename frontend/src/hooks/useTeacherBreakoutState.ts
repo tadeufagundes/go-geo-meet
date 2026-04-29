@@ -77,6 +77,21 @@ function sanitizeStudentAssignments(value: unknown, breakoutRooms: string[]) {
     );
 }
 
+function sanitizeStudentNames(value: unknown) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {} as Record<string, string>;
+    }
+
+    return Object.fromEntries(
+        Object.entries(value).filter(([studentId, studentName]) => (
+            typeof studentId === 'string'
+            && studentId.length > 0
+            && typeof studentName === 'string'
+            && studentName.trim().length > 0
+        ))
+    );
+}
+
 function sanitizeParticipantStudentIds(value: unknown) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return {} as Record<string, string>;
@@ -122,21 +137,28 @@ function getPersistedParticipantStudentIds(storageKey: string) {
     return sanitizeParticipantStudentIds(parseJson(readSessionStorageValue(storageKey), {}));
 }
 
+function getPersistedStudentNames(storageKey: string) {
+    return sanitizeStudentNames(parseJson(readSessionStorageValue(storageKey), {}));
+}
+
 export function useTeacherBreakoutState({ sessionId, mainRoomName }: UseTeacherBreakoutStateOptions) {
     const storageScope = sessionId.trim() || mainRoomName.trim().toLowerCase() || 'default';
     const storageKeys = useMemo(() => ({
         breakoutRooms: buildStorageKey(storageScope, 'rooms'),
         studentAssignments: buildStorageKey(storageScope, 'student-assignments'),
         participantStudentIds: buildStorageKey(storageScope, 'participant-student-ids'),
+        studentNames: buildStorageKey(storageScope, 'student-names'),
     }), [storageScope]);
 
     const [breakoutRoomsState, setBreakoutRoomsState] = useState(() => getPersistedBreakoutRooms(storageKeys.breakoutRooms, mainRoomName));
     const [studentAssignmentsState, setStudentAssignmentsState] = useState(() => getPersistedStudentAssignments(storageKeys.studentAssignments, breakoutRoomsState));
     const [participantStudentIdsState, setParticipantStudentIdsState] = useState(() => getPersistedParticipantStudentIds(storageKeys.participantStudentIds));
+    const [studentNamesState, setStudentNamesState] = useState(() => getPersistedStudentNames(storageKeys.studentNames));
 
     useEffect(() => {
         const nextBreakoutRooms = getPersistedBreakoutRooms(storageKeys.breakoutRooms, mainRoomName);
         const nextParticipantStudentIds = getPersistedParticipantStudentIds(storageKeys.participantStudentIds);
+        const nextStudentNames = getPersistedStudentNames(storageKeys.studentNames);
 
         setBreakoutRoomsState((previousValue) => areStringArraysEqual(previousValue, nextBreakoutRooms) ? previousValue : nextBreakoutRooms);
         setStudentAssignmentsState((previousValue) => {
@@ -146,7 +168,10 @@ export function useTeacherBreakoutState({ sessionId, mainRoomName }: UseTeacherB
         setParticipantStudentIdsState((previousValue) => {
             return areAssignmentMapsEqual(previousValue, nextParticipantStudentIds) ? previousValue : nextParticipantStudentIds;
         });
-    }, [mainRoomName, storageKeys.breakoutRooms, storageKeys.participantStudentIds, storageKeys.studentAssignments]);
+        setStudentNamesState((previousValue) => {
+            return areAssignmentMapsEqual(previousValue, nextStudentNames) ? previousValue : nextStudentNames;
+        });
+    }, [mainRoomName, storageKeys.breakoutRooms, storageKeys.participantStudentIds, storageKeys.studentAssignments, storageKeys.studentNames]);
 
     useEffect(() => {
         setStudentAssignmentsState((previousValue) => {
@@ -166,6 +191,10 @@ export function useTeacherBreakoutState({ sessionId, mainRoomName }: UseTeacherB
     useEffect(() => {
         writeSessionStorageValue(storageKeys.participantStudentIds, JSON.stringify(participantStudentIdsState));
     }, [participantStudentIdsState, storageKeys.participantStudentIds]);
+
+    useEffect(() => {
+        writeSessionStorageValue(storageKeys.studentNames, JSON.stringify(studentNamesState));
+    }, [studentNamesState, storageKeys.studentNames]);
 
     const setBreakoutRooms = useCallback((value: SetStateAction<string[]>) => {
         setBreakoutRoomsState((previousValue) => {
@@ -188,6 +217,13 @@ export function useTeacherBreakoutState({ sessionId, mainRoomName }: UseTeacherB
         });
     }, []);
 
+    const setStudentNames = useCallback((value: SetStateAction<Record<string, string>>) => {
+        setStudentNamesState((previousValue) => {
+            const nextValue = sanitizeStudentNames(resolveStateAction(value, previousValue));
+            return areAssignmentMapsEqual(previousValue, nextValue) ? previousValue : nextValue;
+        });
+    }, []);
+
     return {
         breakoutRooms: breakoutRoomsState,
         setBreakoutRooms,
@@ -195,5 +231,7 @@ export function useTeacherBreakoutState({ sessionId, mainRoomName }: UseTeacherB
         setStudentAssignments,
         participantStudentIds: participantStudentIdsState,
         setParticipantStudentIds,
+        studentNames: studentNamesState,
+        setStudentNames,
     };
 }

@@ -1,9 +1,14 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TeacherPanel } from './TeacherPanel';
+
+const { moveToRoomMock, sendSignalMock } = vi.hoisted(() => ({
+    moveToRoomMock: vi.fn(),
+    sendSignalMock: vi.fn(),
+}));
 
 vi.mock('@/hooks/useFeedback', () => ({
     useTeacherFeedback: () => ({
@@ -14,8 +19,8 @@ vi.mock('@/hooks/useFeedback', () => ({
 vi.mock('@/hooks/useRoomSignaling', () => ({
     useRoomSignaling: () => ({
         isConnected: false,
-        moveToRoom: vi.fn(),
-        sendSignal: vi.fn(),
+        moveToRoom: moveToRoomMock,
+        sendSignal: sendSignalMock,
     }),
 }));
 
@@ -62,6 +67,40 @@ describe('TeacherPanel', () => {
             expect(window.sessionStorage.getItem(buildStorageKey(sessionId, 'participant-student-ids'))).toBe(
                 JSON.stringify(persistedParticipantStudentIds)
             );
+        });
+    });
+
+    it('resolves the participant student id by persisted display name before a fresh presence sync arrives', () => {
+        const sessionId = 'session-1';
+
+        window.sessionStorage.setItem(buildStorageKey(sessionId, 'rooms'), JSON.stringify(['Sala 2']));
+        window.sessionStorage.setItem(buildStorageKey(sessionId, 'student-assignments'), JSON.stringify({
+            studentA: 'Sala 2',
+        }));
+        window.sessionStorage.setItem(buildStorageKey(sessionId, 'student-names'), JSON.stringify({
+            studentA: 'Ana Silva',
+        }));
+
+        render(
+            <TeacherPanel
+                sessionId={sessionId}
+                roomName="Sala Geral"
+                participants={[
+                    {
+                        id: 'participant-live',
+                        displayName: 'Ana Silva',
+                    },
+                ]}
+            />
+        );
+
+        fireEvent.click(screen.getByLabelText('Remover Sala 2'));
+
+        expect(sendSignalMock).toHaveBeenCalledWith('app-signal', {
+            type: 'BREAKOUT_RESET',
+            participantId: 'participant-live',
+            studentId: 'studentA',
+            roomName: 'Sala Geral',
         });
     });
 });

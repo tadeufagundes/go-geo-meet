@@ -30,19 +30,63 @@ export function removeBreakoutRoomAssignments<T extends string>(
     ) as Record<string, T>;
 }
 
+interface ResolveParticipantStudentIdOptions {
+    participantId: string;
+    participantDisplayName?: string;
+    participantStudentIds: Record<string, string>;
+    studentNames: Record<string, string>;
+}
+
+function normalizeParticipantDisplayName(value: string) {
+    return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+}
+
+export function resolveParticipantStudentId({
+    participantId,
+    participantDisplayName,
+    participantStudentIds,
+    studentNames,
+}: ResolveParticipantStudentIdOptions) {
+    const persistedParticipantStudentId = participantStudentIds[participantId];
+
+    if (persistedParticipantStudentId) {
+        return persistedParticipantStudentId;
+    }
+
+    if (!participantDisplayName) {
+        return undefined;
+    }
+
+    const normalizedDisplayName = normalizeParticipantDisplayName(participantDisplayName);
+
+    if (!normalizedDisplayName) {
+        return undefined;
+    }
+
+    const matchingStudentIds = Object.entries(studentNames)
+        .filter(([, studentName]) => normalizeParticipantDisplayName(studentName) === normalizedDisplayName)
+        .map(([studentId]) => studentId);
+
+    return matchingStudentIds.length === 1 ? matchingStudentIds[0] : undefined;
+}
+
 interface ResolveParticipantRoomNameOptions {
     participantId: string;
+    participantDisplayName?: string;
     participantRooms: Record<string, string>;
     participantStudentIds: Record<string, string>;
     studentAssignments: Record<string, string>;
+    studentNames: Record<string, string>;
     mainRoomName: string;
 }
 
 export function resolveParticipantRoomName({
     participantId,
+    participantDisplayName,
     participantRooms,
     participantStudentIds,
     studentAssignments,
+    studentNames,
     mainRoomName,
 }: ResolveParticipantRoomNameOptions) {
     const participantRoom = participantRooms[participantId];
@@ -51,7 +95,12 @@ export function resolveParticipantRoomName({
         return participantRoom;
     }
 
-    const studentId = participantStudentIds[participantId];
+    const studentId = resolveParticipantStudentId({
+        participantId,
+        participantDisplayName,
+        participantStudentIds,
+        studentNames,
+    });
     const assignedRoom = studentId ? studentAssignments[studentId] : undefined;
 
     return assignedRoom || mainRoomName;

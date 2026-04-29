@@ -14,6 +14,7 @@ import {
     getNextBreakoutRoomName,
     removeBreakoutRoomAssignments,
     resolveParticipantRoomName,
+    resolveParticipantStudentId,
 } from './breakoutRoomManager';
 
 interface TeacherPanelProps {
@@ -62,6 +63,8 @@ export function TeacherPanel({
         setStudentAssignments,
         participantStudentIds,
         setParticipantStudentIds,
+        studentNames,
+        setStudentNames,
     } = useTeacherBreakoutState({
         sessionId: sessionId || roomName,
         mainRoomName: roomName,
@@ -97,6 +100,11 @@ export function TeacherPanel({
             setParticipantStudentIds((prev) => ({
                 ...prev,
                 [studentPresence.participantId]: studentPresence.studentId,
+            }));
+
+            setStudentNames((prev) => ({
+                ...prev,
+                [studentPresence.studentId]: studentPresence.studentName,
             }));
 
             setParticipantRooms((prev) => ({
@@ -203,18 +211,33 @@ export function TeacherPanel({
         ));
     }, [participants, setParticipantStudentIds]);
 
+    const resolvedParticipantStudentIds = useMemo<Record<string, string>>(() => Object.fromEntries(
+        participants.flatMap((participant) => {
+            const studentId = resolveParticipantStudentId({
+                participantId: participant.id,
+                participantDisplayName: participant.displayName,
+                participantStudentIds,
+                studentNames,
+            });
+
+            return studentId ? [[participant.id, studentId]] : [];
+        })
+    ), [participantStudentIds, participants, studentNames]);
+
     const resolvedParticipantRooms = useMemo<Record<string, string>>(() => Object.fromEntries(
         participants.map((participant) => [
             participant.id,
             resolveParticipantRoomName({
                 participantId: participant.id,
+                participantDisplayName: participant.displayName,
                 participantRooms,
                 participantStudentIds,
                 studentAssignments,
+                studentNames,
                 mainRoomName: roomName,
             }),
         ])
-    ), [participantRooms, participantStudentIds, participants, roomName, studentAssignments]);
+    ), [participantRooms, participantStudentIds, participants, roomName, studentAssignments, studentNames]);
 
     const getParticipantDisplayRoom = useCallback((participantId: string) => {
         return resolvedParticipantRooms[participantId] || roomName;
@@ -256,7 +279,7 @@ export function TeacherPanel({
             sendSignal('app-signal', {
                 type: 'BREAKOUT_RESET',
                 participantId,
-                studentId: participantStudentIds[participantId],
+                studentId: resolvedParticipantStudentIds[participantId],
                 roomName,
             });
         });
@@ -273,7 +296,7 @@ export function TeacherPanel({
             rooms,
             mainRoomName: roomName,
         });
-    }, [breakoutRooms, participantStudentIds, resolvedParticipantRooms, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
+    }, [breakoutRooms, resolvedParticipantRooms, resolvedParticipantStudentIds, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
 
     const handleAddBreakoutRoom = useCallback(() => {
         const nextRoomName = getNextBreakoutRoomName(breakoutRooms);
@@ -297,7 +320,7 @@ export function TeacherPanel({
             sendSignal('app-signal', {
                 type: 'BREAKOUT_RESET',
                 participantId,
-                studentId: participantStudentIds[participantId],
+                studentId: resolvedParticipantStudentIds[participantId],
                 roomName,
             });
         });
@@ -310,10 +333,10 @@ export function TeacherPanel({
             rooms: nextRooms,
             mainRoomName: roomName,
         });
-    }, [breakoutRooms, participantStudentIds, resolvedParticipantRooms, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
+    }, [breakoutRooms, resolvedParticipantRooms, resolvedParticipantStudentIds, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
 
     const handleAssignParticipant = useCallback((participant: Participant, nextRoom: string) => {
-        const participantStudentId = participantStudentIds[participant.id];
+        const participantStudentId = resolvedParticipantStudentIds[participant.id];
 
         if (nextRoom !== roomName) {
             onSendToBreakoutRoom?.(participant.id, nextRoom);
@@ -352,7 +375,7 @@ export function TeacherPanel({
                 };
             });
         }
-    }, [onSendToBreakoutRoom, participantStudentIds, roomName, sendSignal, setStudentAssignments]);
+    }, [onSendToBreakoutRoom, resolvedParticipantStudentIds, roomName, sendSignal, setStudentAssignments]);
 
     const handleAutoDistributeParticipants = useCallback(() => {
         if (breakoutRooms.length === 0) {
