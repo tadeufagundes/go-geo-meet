@@ -28,14 +28,26 @@ describe('resolveStudentPresenceSync', () => {
         });
     });
 
-    it('keeps the current room when it is still valid and no reassignment exists', () => {
+    it('keeps the current room when the student is already in the main room and no reassignment exists', () => {
+        expect(resolveStudentPresenceSync({
+            breakoutRooms: ['Sala 1', 'Sala 2'],
+            mainRoomName: 'Sala Geral',
+            currentRoomName: 'Sala Geral',
+        })).toEqual({
+            action: 'noop',
+            displayRoomName: 'Sala Geral',
+        });
+    });
+
+    it('resets a reconnecting student to the main room when no teacher assignment exists anymore', () => {
         expect(resolveStudentPresenceSync({
             breakoutRooms: ['Sala 1', 'Sala 2'],
             mainRoomName: 'Sala Geral',
             currentRoomName: 'Sala 1',
         })).toEqual({
-            action: 'noop',
-            displayRoomName: 'Sala 1',
+            action: 'reset',
+            targetRoomName: 'Sala Geral',
+            displayRoomName: 'Sala Geral',
         });
     });
 });

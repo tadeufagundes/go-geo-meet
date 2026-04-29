@@ -55,6 +55,14 @@ export function resolveStudentPresenceSync({
             };
     }
 
+    if (currentRoomName !== mainRoomName && breakoutRooms.includes(currentRoomName)) {
+        return {
+            action: 'reset',
+            targetRoomName: mainRoomName,
+            displayRoomName: mainRoomName,
+        };
+    }
+
     if (isValidRoomName(currentRoomName, breakoutRooms, mainRoomName)) {
         return {
             action: 'noop',
