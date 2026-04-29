@@ -188,6 +188,10 @@ export function TeacherPanel({
     }, [conferenceDomain, isConnected, isMeetingReady, sendSignal]);
 
     useEffect(() => {
+        if (participants.length === 0) {
+            return;
+        }
+
         const activeParticipantIds = new Set(participants.map((participant) => participant.id));
 
         setParticipantRooms((prev) => Object.fromEntries(
