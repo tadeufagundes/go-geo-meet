@@ -30,6 +30,33 @@ export function removeBreakoutRoomAssignments<T extends string>(
     ) as Record<string, T>;
 }
 
+interface ResolveParticipantRoomNameOptions {
+    participantId: string;
+    participantRooms: Record<string, string>;
+    participantStudentIds: Record<string, string>;
+    studentAssignments: Record<string, string>;
+    mainRoomName: string;
+}
+
+export function resolveParticipantRoomName({
+    participantId,
+    participantRooms,
+    participantStudentIds,
+    studentAssignments,
+    mainRoomName,
+}: ResolveParticipantRoomNameOptions) {
+    const participantRoom = participantRooms[participantId];
+
+    if (participantRoom) {
+        return participantRoom;
+    }
+
+    const studentId = participantStudentIds[participantId];
+    const assignedRoom = studentId ? studentAssignments[studentId] : undefined;
+
+    return assignedRoom || mainRoomName;
+}
+
 export function distributeParticipantsAcrossBreakoutRooms(
     participants: Participant[],
     breakoutRooms: string[],

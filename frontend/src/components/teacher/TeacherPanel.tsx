@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Users, HelpCircle, Shuffle, X, Monitor, MicOff, UserX, LayoutGrid, Brain, Zap, Trophy, Music, Heart, Plus, Trash2 } from 'lucide-react';
 import { useTeacherFeedback } from '@/hooks/useFeedback';
 import { useRoomSignaling } from '@/hooks/useRoomSignaling';
@@ -13,6 +13,7 @@ import {
     distributeParticipantsAcrossBreakoutRooms,
     getNextBreakoutRoomName,
     removeBreakoutRoomAssignments,
+    resolveParticipantRoomName,
 } from './breakoutRoomManager';
 
 interface TeacherPanelProps {
@@ -198,18 +199,22 @@ export function TeacherPanel({
         ));
     }, [participants, setParticipantStudentIds]);
 
+    const resolvedParticipantRooms = useMemo<Record<string, string>>(() => Object.fromEntries(
+        participants.map((participant) => [
+            participant.id,
+            resolveParticipantRoomName({
+                participantId: participant.id,
+                participantRooms,
+                participantStudentIds,
+                studentAssignments,
+                mainRoomName: roomName,
+            }),
+        ])
+    ), [participantRooms, participantStudentIds, participants, roomName, studentAssignments]);
+
     const getParticipantDisplayRoom = useCallback((participantId: string) => {
-        const participantRoom = participantRooms[participantId];
-
-        if (participantRoom) {
-            return participantRoom;
-        }
-
-        const studentId = participantStudentIds[participantId];
-        const assignedRoom = studentId ? studentAssignments[studentId] : undefined;
-
-        return assignedRoom || roomName;
-    }, [participantRooms, participantStudentIds, roomName, studentAssignments]);
+        return resolvedParticipantRooms[participantId] || roomName;
+    }, [resolvedParticipantRooms, roomName]);
 
     const handlePickRandom = useCallback(() => {
         if (participants.length === 0) return;
@@ -240,7 +245,8 @@ export function TeacherPanel({
         }
 
         const rooms = buildBreakoutRooms(roomCount);
-        const removedAssignments = Object.entries(participantRooms).filter(([, assignedRoom]) => !rooms.includes(assignedRoom));
+        const removedAssignments = Object.entries(resolvedParticipantRooms)
+            .filter(([, assignedRoom]) => assignedRoom !== roomName && !rooms.includes(assignedRoom));
 
         removedAssignments.forEach(([participantId]) => {
             sendSignal('app-signal', {
@@ -263,7 +269,7 @@ export function TeacherPanel({
             rooms,
             mainRoomName: roomName,
         });
-    }, [breakoutRooms, participantRooms, participantStudentIds, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
+    }, [breakoutRooms, participantStudentIds, resolvedParticipantRooms, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
 
     const handleAddBreakoutRoom = useCallback(() => {
         const nextRoomName = getNextBreakoutRoomName(breakoutRooms);
@@ -278,7 +284,7 @@ export function TeacherPanel({
     }, [breakoutRooms, roomName, sendSignal, setBreakoutRooms]);
 
     const handleRemoveBreakoutRoom = useCallback((breakoutRoom: string) => {
-        const affectedParticipantIds = Object.entries(participantRooms)
+        const affectedParticipantIds = Object.entries(resolvedParticipantRooms)
             .filter(([, assignedRoom]) => assignedRoom === breakoutRoom)
             .map(([participantId]) => participantId);
         const nextRooms = breakoutRooms.filter((room) => room !== breakoutRoom);
@@ -300,7 +306,7 @@ export function TeacherPanel({
             rooms: nextRooms,
             mainRoomName: roomName,
         });
-    }, [breakoutRooms, participantRooms, participantStudentIds, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
+    }, [breakoutRooms, participantStudentIds, resolvedParticipantRooms, roomName, sendSignal, setBreakoutRooms, setStudentAssignments]);
 
     const handleAssignParticipant = useCallback((participant: Participant, nextRoom: string) => {
         const participantStudentId = participantStudentIds[participant.id];
@@ -516,7 +522,7 @@ export function TeacherPanel({
                     ) : (
                         <div className="space-y-2">
                             {breakoutRooms.map((breakoutRoom) => {
-                                const occupants = participants.filter((participant) => getParticipantDisplayRoom(participant.id) === breakoutRoom).length;
+                                const occupants = Object.values(resolvedParticipantRooms).filter((assignedRoom) => assignedRoom === breakoutRoom).length;
 
                                 return (
                                     <div key={breakoutRoom} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">

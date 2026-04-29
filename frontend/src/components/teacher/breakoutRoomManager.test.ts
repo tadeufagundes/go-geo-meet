@@ -5,6 +5,7 @@ import {
     distributeParticipantsAcrossBreakoutRooms,
     getNextBreakoutRoomName,
     removeBreakoutRoomAssignments,
+    resolveParticipantRoomName,
 } from './breakoutRoomManager';
 
 describe('breakoutRoomManager', () => {
@@ -19,6 +20,36 @@ describe('breakoutRoomManager', () => {
 
     it('removes all assignments from the deleted room only', () => {
         expect(removeBreakoutRoomAssignments({ a: 'Sala 1', b: 'Sala 2' }, 'Sala 1')).toEqual({ b: 'Sala 2' });
+    });
+
+    it('falls back to the persisted student assignment when live participant room is not available', () => {
+        expect(resolveParticipantRoomName({
+            participantId: 'participant-1',
+            participantRooms: {},
+            participantStudentIds: {
+                'participant-1': 'student-1',
+            },
+            studentAssignments: {
+                'student-1': 'Sala 2',
+            },
+            mainRoomName: 'Sala Geral',
+        })).toBe('Sala 2');
+    });
+
+    it('prefers the live participant room when it is already known', () => {
+        expect(resolveParticipantRoomName({
+            participantId: 'participant-1',
+            participantRooms: {
+                'participant-1': 'Sala 1',
+            },
+            participantStudentIds: {
+                'participant-1': 'student-1',
+            },
+            studentAssignments: {
+                'student-1': 'Sala 2',
+            },
+            mainRoomName: 'Sala Geral',
+        })).toBe('Sala 1');
     });
 
     it('distributes participants across breakout rooms deterministically', () => {
