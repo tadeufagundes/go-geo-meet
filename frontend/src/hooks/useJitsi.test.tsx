@@ -30,12 +30,13 @@ function createMockApi(): MockApi {
 
 const apiFactory = vi.fn(() => createMockApi());
 
-function Harness({ onReady }: { onReady?: (participantId: string) => void }) {
+function Harness({ onReady, domain }: { onReady?: (participantId: string) => void; domain?: string }) {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useJitsi(containerRef, {
         roomName: 'room-1',
         displayName: 'Aluno',
+        domain,
         role: 'student',
         onReady,
     });
@@ -79,5 +80,17 @@ describe('useJitsi', () => {
         unmount();
 
         expect(api.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses the explicit conference domain when one is provided', () => {
+        render(<Harness domain="jitsi.hamburg.ccc.de" />);
+
+        expect(apiFactory).toHaveBeenCalledTimes(1);
+        expect(apiFactory).toHaveBeenCalledWith(
+            'jitsi.hamburg.ccc.de',
+            expect.objectContaining({
+                roomName: 'room-1',
+            })
+        );
     });
 });

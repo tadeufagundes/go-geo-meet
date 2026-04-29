@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { EMBEDDABLE_JITSI_SERVERS } from '@/config/jitsiServers';
 
 interface BroadcastViewProps {
     roomName: string;
     displayName: string;
     isActive: boolean;
+    domain?: string;
 }
 
 /**
@@ -11,7 +13,7 @@ interface BroadcastViewProps {
  * 
  * Used by students while in breakout rooms to see the teacher's main share.
  */
-export function BroadcastView({ roomName, displayName, isActive }: BroadcastViewProps) {
+export function BroadcastView({ roomName, displayName, isActive, domain }: BroadcastViewProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const apiRef = useRef<any>(null);
     const [isLoaded, setIsLoaded] = useState(false);
@@ -25,8 +27,8 @@ export function BroadcastView({ roomName, displayName, isActive }: BroadcastView
                 return;
             }
 
-            const domain = 'meet.jit.si'; // Or your preferred server
-            const api = new (window as any).JitsiMeetExternalAPI(domain, {
+            const jitsiDomain = domain || EMBEDDABLE_JITSI_SERVERS[0];
+            const api = new (window as any).JitsiMeetExternalAPI(jitsiDomain, {
                 roomName,
                 parentNode: containerRef.current,
                 width: '100%',
@@ -63,7 +65,7 @@ export function BroadcastView({ roomName, displayName, isActive }: BroadcastView
                 apiRef.current = null;
             }
         };
-    }, [isActive, roomName, displayName]);
+    }, [displayName, domain, isActive, roomName]);
 
     if (!isActive) return null;
 

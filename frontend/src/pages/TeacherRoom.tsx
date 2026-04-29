@@ -45,6 +45,7 @@ export function TeacherRoom() {
 
     const [participants, setParticipants] = useState<Participant[]>([]);
     const [pipWindow, setPipWindow] = useState<Window | null>(null);
+    const [conferenceDomain, setConferenceDomain] = useState<string | null>(null);
     const [isJitsiReady, setIsJitsiReady] = useState(false);
     const [isScreenSharing, setIsScreenSharing] = useState(false);
     const [liveTranscript, setLiveTranscript] = useState<string>('Aguardando fala para transcrever...');
@@ -134,6 +135,7 @@ export function TeacherRoom() {
                     jitsiApiRef.current = null;
                 }
                 container.innerHTML = '';
+                setConferenceDomain(null);
                 setIsJitsiReady(false);
                 setParticipants([]);
                 setIsScreenSharing(false);
@@ -210,6 +212,12 @@ export function TeacherRoom() {
                     hasJoinedConference = true;
                     clearJoinFallbackTimeout();
                     console.log('[PiP] Conference joined');
+                    setConferenceDomain(domain);
+                    if (apiSessionId) {
+                        void sessionService.updateSessionConferenceDomain(apiSessionId, domain).catch((error) => {
+                            console.error('[PiP] Failed to persist conference domain:', error);
+                        });
+                    }
                     setIsJitsiReady(true);
                 });
 
@@ -292,7 +300,7 @@ export function TeacherRoom() {
             console.error('[PiP] Error:', error);
             alert('Erro ao abrir janela flutuante. Tente novamente.');
         }
-    }, [roomName, teacherName]);
+    }, [apiSessionId, roomName, teacherName]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -414,6 +422,7 @@ export function TeacherRoom() {
                             <TeacherPanel
                                 sessionId={apiSessionId}
                                 roomName={roomName}
+                                conferenceDomain={conferenceDomain || undefined}
                                 participants={participants}
                                 onEndSession={handleEndSession}
                                 onShareScreen={handleShareScreen}

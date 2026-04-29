@@ -27,6 +27,7 @@ export interface ClassSession {
     teacherId: string;
     teacherName: string;
     jitsiRoomName: string;
+    conferenceDomain?: string;
     jitsiRoomPassword: string;
     status: 'scheduled' | 'live' | 'completed';
     scheduledAt: Timestamp;
@@ -43,6 +44,7 @@ export interface SessionDTO {
     teacherId: string;
     teacherName: string;
     jitsiRoomName: string;
+    conferenceDomain?: string;
     status: 'scheduled' | 'live' | 'completed';
     scheduledAt: string;
     startedAt?: string;
@@ -105,6 +107,7 @@ export async function createSession(turmaId: string, turmaName: string): Promise
         teacherId: user.uid,
         teacherName: sessionData.teacherName,
         jitsiRoomName: roomName,
+        conferenceDomain: undefined,
         status: 'scheduled',
         scheduledAt: now.toDate().toISOString(),
     };
@@ -135,6 +138,7 @@ export async function listSessions(): Promise<SessionDTO[]> {
             teacherId: data.teacherId,
             teacherName: data.teacherName,
             jitsiRoomName: data.jitsiRoomName,
+            conferenceDomain: data.conferenceDomain,
             status: data.status,
             scheduledAt: data.scheduledAt?.toDate().toISOString() || '',
             startedAt: data.startedAt?.toDate().toISOString(),
@@ -160,6 +164,7 @@ export async function getSession(sessionId: string): Promise<SessionDTO | null> 
         teacherId: data.teacherId,
         teacherName: data.teacherName,
         jitsiRoomName: data.jitsiRoomName,
+        conferenceDomain: data.conferenceDomain,
         status: data.status,
         scheduledAt: data.scheduledAt?.toDate().toISOString() || '',
         startedAt: data.startedAt?.toDate().toISOString(),
@@ -190,6 +195,7 @@ async function getSessionByRoomName(roomName: string): Promise<SessionDTO | null
         teacherId: data.teacherId,
         teacherName: data.teacherName,
         jitsiRoomName: data.jitsiRoomName,
+        conferenceDomain: data.conferenceDomain,
         status: data.status,
         scheduledAt: data.scheduledAt?.toDate().toISOString() || '',
         startedAt: data.startedAt?.toDate().toISOString(),
@@ -216,6 +222,14 @@ export async function startSession(sessionId: string): Promise<void> {
     await updateDoc(docRef, {
         status: 'live',
         startedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    });
+}
+
+export async function updateSessionConferenceDomain(sessionId: string, conferenceDomain: string): Promise<void> {
+    const docRef = doc(db, SESSIONS_COLLECTION, sessionId);
+    await updateDoc(docRef, {
+        conferenceDomain,
         updatedAt: serverTimestamp(),
     });
 }

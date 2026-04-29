@@ -5,6 +5,7 @@ import type { Participant } from '@/types';
 interface JitsiMeetProps {
     roomName: string;
     displayName: string;
+    domain?: string;
     password?: string;
     role: 'teacher' | 'student';
     onParticipantJoined?: (participant: Participant) => void;
@@ -17,6 +18,7 @@ interface JitsiMeetProps {
 export function JitsiMeet({
     roomName,
     displayName,
+    domain,
     password,
     role,
     onParticipantJoined,
@@ -30,6 +32,7 @@ export function JitsiMeet({
     const { isReady, participants } = useJitsi(containerRef, {
         roomName,
         displayName,
+        domain,
         password,
         role,
         onParticipantJoined,

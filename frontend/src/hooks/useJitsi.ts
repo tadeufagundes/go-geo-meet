@@ -5,6 +5,7 @@ import type { Participant } from '@/types';
 interface UseJitsiOptions {
     roomName: string;
     displayName: string;
+    domain?: string;
     password?: string;
     role?: 'teacher' | 'student';
     onParticipantJoined?: (participant: Participant) => void;
@@ -34,6 +35,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
     const {
         roomName,
         displayName,
+        domain,
         password,
         role = 'student',
         onParticipantJoined,
@@ -352,7 +354,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
 
     // Server Configuration with Fallback
     // TODO: Resolver questão de servidor (comunitário ou próprio) depois
-    const JITSI_SERVERS = [...EMBEDDABLE_JITSI_SERVERS];
+    const JITSI_SERVERS = domain ? [domain] : [...EMBEDDABLE_JITSI_SERVERS];
 
     useEffect(() => {
         const serverIndex = 0;
@@ -396,7 +398,7 @@ export function useJitsi(containerRef: React.RefObject<HTMLElement>, options: Us
         return () => {
             dispose();
         };
-    }, [initJitsi, dispose]);
+    }, [dispose, initJitsi, domain]);
 
     return {
         api: apiRef.current,

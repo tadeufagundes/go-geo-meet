@@ -20,6 +20,7 @@ export interface SessionDTO {
     teacherId: string;
     teacherName: string;
     jitsiRoomName: string;
+    conferenceDomain?: string;
     status: SessionStatus;
     scheduledAt: string;
     startedAt?: string;

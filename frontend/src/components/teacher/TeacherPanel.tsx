@@ -18,6 +18,7 @@ import {
 interface TeacherPanelProps {
     sessionId: string;
     roomName: string;
+    conferenceDomain?: string;
     participants: Participant[];
     onEndSession?: () => void;
     onShareScreen?: () => void;
@@ -32,6 +33,7 @@ interface TeacherPanelProps {
 export function TeacherPanel({ 
     sessionId, 
     roomName, 
+    conferenceDomain,
     participants,
     onEndSession,
     onShareScreen,
@@ -51,6 +53,7 @@ export function TeacherPanel({
     const [participantStudentIds, setParticipantStudentIds] = useState<Record<string, string>>({});
     const syncedBreakoutRoomsRef = useRef<string[]>([]);
     const hasRequestedPresenceSyncRef = useRef(false);
+    const syncedConferenceDomainRef = useRef<string | null>(null);
 
     const { breakoutRooms, setBreakoutRooms, studentAssignments, setStudentAssignments } = useTeacherBreakoutState({
         sessionId: sessionId || roomName,
@@ -159,6 +162,23 @@ export function TeacherPanel({
             type: 'PRESENCE_SYNC_REQUEST',
         });
     }, [isConnected, isMeetingReady, sendSignal]);
+
+    useEffect(() => {
+        if (!isConnected || !isMeetingReady || !conferenceDomain) {
+            syncedConferenceDomainRef.current = null;
+            return;
+        }
+
+        if (syncedConferenceDomainRef.current === conferenceDomain) {
+            return;
+        }
+
+        syncedConferenceDomainRef.current = conferenceDomain;
+        sendSignal('app-signal', {
+            type: 'SESSION_DOMAIN_SYNC',
+            domain: conferenceDomain,
+        });
+    }, [conferenceDomain, isConnected, isMeetingReady, sendSignal]);
 
     useEffect(() => {
         const activeParticipantIds = new Set(participants.map((participant) => participant.id));

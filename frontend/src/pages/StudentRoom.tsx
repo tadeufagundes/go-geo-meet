@@ -25,6 +25,7 @@ function ResolvedStudentRoom({ session, studentName }: ResolvedStudentRoomProps)
     const [attendanceId, setAttendanceId] = useState<string | null>(null);
     const [currentQuiz, setCurrentQuiz] = useState<QuizQuestion | null>(null);
     const [activeReaction, setActiveReaction] = useState<string | null>(null);
+    const [conferenceDomain, setConferenceDomain] = useState<string | undefined>(session.conferenceDomain);
     const [localParticipantId, setLocalParticipantId] = useState<string | null>(null);
     const [presenceSyncVersion, setPresenceSyncVersion] = useState(0);
     const hasJoined = useRef(false);
@@ -49,6 +50,8 @@ function ResolvedStudentRoom({ session, studentName }: ResolvedStudentRoomProps)
             if (payload.type === 'QUIZ_RECEIVED') {
                 console.log('[Student] Quiz received:', payload.quiz);
                 setCurrentQuiz(payload.quiz);
+            } else if (payload.type === 'SESSION_DOMAIN_SYNC' && typeof payload.domain === 'string') {
+                setConferenceDomain((previousDomain) => previousDomain === payload.domain ? previousDomain : payload.domain);
             } else if (
                 payload.type === 'BREAKOUT_ASSIGNMENT'
                 && (payload.studentId === studentId || payload.participantId === localParticipantId)
@@ -100,6 +103,10 @@ function ResolvedStudentRoom({ session, studentName }: ResolvedStudentRoomProps)
             currentRoomName,
         });
     }, [apiSessionId, currentRoomName, isConnected, localParticipantId, presenceSyncVersion, sendSignal, studentId, studentName]);
+
+    useEffect(() => {
+        setConferenceDomain(session.conferenceDomain);
+    }, [session.conferenceDomain]);
 
     const handleMeetingEnd = useCallback(async () => {
         resetRoomName();
@@ -192,6 +199,7 @@ function ResolvedStudentRoom({ session, studentName }: ResolvedStudentRoomProps)
                     <JitsiMeet
                         roomName={currentRoomName}
                         displayName={studentName}
+                        domain={conferenceDomain}
                         role="student"
                         onMeetingEnd={handleMeetingEnd}
                         onReady={(participantId) => {
@@ -216,6 +224,7 @@ function ResolvedStudentRoom({ session, studentName }: ResolvedStudentRoomProps)
                         <BroadcastView
                             roomName={roomName}
                             displayName={studentName}
+                            domain={conferenceDomain}
                             isActive={true}
                         />
                     </div>
