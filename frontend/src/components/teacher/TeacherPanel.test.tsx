@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TeacherPanel } from './TeacherPanel';
 
-const { moveToRoomMock, sendSignalMock } = vi.hoisted(() => ({
+const { moveToRoomMock, sendSignalMock, roomSignalingState } = vi.hoisted(() => ({
     moveToRoomMock: vi.fn(),
     sendSignalMock: vi.fn(),
+    roomSignalingState: {
+        onBroadcastReceived: undefined as undefined | ((payload: Record<string, unknown>) => void),
+    },
 }));
 
 vi.mock('@/hooks/useFeedback', () => ({
@@ -17,11 +20,15 @@ vi.mock('@/hooks/useFeedback', () => ({
 }));
 
 vi.mock('@/hooks/useRoomSignaling', () => ({
-    useRoomSignaling: () => ({
-        isConnected: false,
-        moveToRoom: moveToRoomMock,
-        sendSignal: sendSignalMock,
-    }),
+    useRoomSignaling: ({ onBroadcastReceived }: { onBroadcastReceived?: (payload: Record<string, unknown>) => void }) => {
+        roomSignalingState.onBroadcastReceived = onBroadcastReceived;
+
+        return {
+            isConnected: false,
+            moveToRoom: moveToRoomMock,
+            sendSignal: sendSignalMock,
+        };
+    },
 }));
 
 const STORAGE_PREFIX = 'gogeo:meet:teacher-breakout';
@@ -38,6 +45,7 @@ describe('TeacherPanel', () => {
     afterEach(() => {
         cleanup();
         vi.clearAllMocks();
+        roomSignalingState.onBroadcastReceived = undefined;
     });
 
     it('does not clear persisted participant mappings while the participant list is still empty on hydration', async () => {
@@ -101,6 +109,48 @@ describe('TeacherPanel', () => {
             participantId: 'participant-live',
             studentId: 'studentA',
             roomName: 'Sala Geral',
+        });
+    });
+
+    it('does not reassign a student back to a stale breakout after the teacher returns them to the main room before the student id is known', () => {
+        const sessionId = 'session-1';
+
+        window.sessionStorage.setItem(buildStorageKey(sessionId, 'rooms'), JSON.stringify(['Sala 2']));
+        window.sessionStorage.setItem(buildStorageKey(sessionId, 'student-assignments'), JSON.stringify({
+            studentA: 'Sala 2',
+        }));
+
+        render(
+            <TeacherPanel
+                sessionId={sessionId}
+                roomName="Sala Geral"
+                participants={[
+                    {
+                        id: 'participant-live',
+                        displayName: 'Ana Silva',
+                    },
+                ]}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Geral' }));
+
+        act(() => {
+            roomSignalingState.onBroadcastReceived?.({
+                type: 'STUDENT_PRESENCE',
+                participantId: 'participant-live',
+                studentId: 'studentA',
+                studentName: 'Ana Silva',
+                currentRoomName: 'Sala Geral',
+            });
+        });
+
+        expect(sendSignalMock).not.toHaveBeenCalledWith('app-signal', {
+            type: 'BREAKOUT_ASSIGNMENT',
+            participantId: 'participant-live',
+            studentId: 'studentA',
+            roomName: 'Sala 2',
+            mainRoomName: 'Sala Geral',
         });
     });
 });

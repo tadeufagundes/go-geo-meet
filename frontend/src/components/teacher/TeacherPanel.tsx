@@ -89,7 +89,9 @@ export function TeacherPanel({
 
             const studentPresence = payload as StudentPresencePayload;
             const participantAssignedRoom = participantRooms[studentPresence.participantId];
-            const stableAssignedRoom = studentAssignments[studentPresence.studentId] ?? participantAssignedRoom;
+            const stableAssignedRoom = participantAssignedRoom === roomName
+                ? roomName
+                : studentAssignments[studentPresence.studentId] ?? participantAssignedRoom;
             const syncResolution = resolveStudentPresenceSync({
                 assignedRoomName: stableAssignedRoom,
                 breakoutRooms,
@@ -117,6 +119,15 @@ export function TeacherPanel({
                     ...prev,
                     [studentPresence.studentId]: stableAssignedRoom,
                 }));
+            } else if (participantAssignedRoom === roomName) {
+                setStudentAssignments((prev) => {
+                    if (!prev[studentPresence.studentId]) {
+                        return prev;
+                    }
+
+                    const { [studentPresence.studentId]: _removed, ...rest } = prev;
+                    return rest;
+                });
             }
 
             if (syncResolution.action === 'assign') {
@@ -351,11 +362,6 @@ export function TeacherPanel({
         });
 
         setParticipantRooms((prev) => {
-            if (nextRoom === roomName) {
-                const { [participant.id]: _removed, ...rest } = prev;
-                return rest;
-            }
-
             return {
                 ...prev,
                 [participant.id]: nextRoom,
